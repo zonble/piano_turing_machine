@@ -5,9 +5,11 @@ import './App.css'
 
 const keyNames = ['F','F♯','G','G♯','A','A♯','B','C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B','C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B','C','C♯','D','D♯','E','F']
 const blackKeys = new Set(['F♯','G♯','A♯','C♯','D♯'])
-const keyboardMap = ['z','s','x','d','c','v','g','b','h','n','j','m','q','2','w','3','e','4','r','5','t','6','y','7','u','8','i','9','o','0','p','-','[','=',']','\\']
-const actionPurposes = ['READ 0','READ 1','MOVE LEFT','MOVE RIGHT','WRITE 0','WRITE 1','BLANK','STATE +','STATE −','CARRY','COMPARE','HALT','STEP','READ 0','READ 1','MOVE LEFT','MOVE RIGHT','WRITE 0','WRITE 1','BLANK','STATE CHANGE','CARRY','COMPARE','FINAL CHORD','RESERVED']
-const keyPurpose = (index: number) => index < 12 ? `STATE ${index}` : actionPurposes[index - 12]
+const whiteKeyIndices = keyNames.map((name, index) => blackKeys.has(name) ? -1 : index).filter((index) => index >= 0)
+const whitePurposes = ['STATE 0','STATE 1','STATE 2','STATE 3','STATE 4','STATE 5','HALT','READ 0','READ 1','MOVE LEFT','MOVE RIGHT','WRITE 0','WRITE 1','BLANK','STEP','CARRY','COMPARE','STATE CHANGE','FINAL CHORD','RESERVED','RESERVED','RESERVED']
+const whiteKeyboardMap = ['z','x','c','v','b','n','m','q','w','e','r','t','y','u','i','o','p','a','s','d','f','g']
+const keyboardMap = keyNames.map((_, index) => whiteKeyboardMap[whiteKeyIndices.indexOf(index)] ?? '—')
+const keyPurpose = (index: number) => { const whiteIndex = whiteKeyIndices.indexOf(index); return whiteIndex >= 0 ? whitePurposes[whiteIndex] : 'MELODY ONLY' }
 
 function App() {
   const [preset, setPreset] = useState<Preset>(presets[0]); const [machine, setMachine] = useState<MachineSnapshot>(() => resetMachine(presets[0])); const [running, setRunning] = useState(false); const [speed, setSpeed] = useState(4); const [mode, setMode] = useState<'auto'|'manual'>('auto'); const [pressedKey, setPressedKey] = useState<number|null>(null)
@@ -15,7 +17,7 @@ function App() {
   const step = useCallback(() => { setMachine((current) => { const next = executeStep(current, preset); const rule = next.lastTransition; if (rule) { const midi = rule.direction === 'L' ? 48 : rule.direction === 'R' ? 60 : rule.write === '1' ? 67 : 64; playTone(pianoFrequency(midi), .2, rule.to === 'halt' ? 'sine' : 'triangle') } else playTone(pianoFrequency(41), .5, 'sine'); if (next.halted) setRunning(false); return next }) }, [preset])
   const activateKey = useCallback((index: number) => {
     setPressedKey(index); playTone(pianoFrequency(41 + index), .45); window.setTimeout(() => setPressedKey(null), 220)
-    const action = index >= 12 ? actionPurposes[index - 12] : undefined
+    const action = keyPurpose(index)
     if (!action) return
     if (action === 'STEP') { step(); return }
     setMachine((current) => {
