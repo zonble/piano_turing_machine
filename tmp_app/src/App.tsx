@@ -13,8 +13,23 @@ function App() {
   const [preset, setPreset] = useState<Preset>(presets[0]); const [machine, setMachine] = useState<MachineSnapshot>(() => resetMachine(presets[0])); const [running, setRunning] = useState(false); const [speed, setSpeed] = useState(4); const [mode, setMode] = useState<'auto'|'manual'>('auto'); const [pressedKey, setPressedKey] = useState<number|null>(null)
   const reset = useCallback((next = preset) => { setRunning(false); setMachine(resetMachine(next)) }, [preset])
   const step = useCallback(() => { setMachine((current) => { const next = executeStep(current, preset); const rule = next.lastTransition; if (rule) { const midi = rule.direction === 'L' ? 48 : rule.direction === 'R' ? 60 : rule.write === '1' ? 67 : 64; playTone(pianoFrequency(midi), .2, rule.to === 'halt' ? 'sine' : 'triangle') } else playTone(pianoFrequency(41), .5, 'sine'); if (next.halted) setRunning(false); return next }) }, [preset])
+  const activateKey = useCallback((index: number) => {
+    setPressedKey(index); playTone(pianoFrequency(41 + index), .45); window.setTimeout(() => setPressedKey(null), 220)
+    const action = index >= 12 ? actionPurposes[index - 12] : undefined
+    if (!action) return
+    if (action === 'STEP') { step(); return }
+    setMachine((current) => {
+      const tape = { ...current.tape }
+      if (action === 'MOVE LEFT') return { ...current, head: current.head - 1, step: current.step + 1 }
+      if (action === 'MOVE RIGHT') return { ...current, head: current.head + 1, step: current.step + 1 }
+      if (action === 'WRITE 0') { tape[current.head] = '0'; return { ...current, tape, step: current.step + 1 } }
+      if (action === 'WRITE 1') { tape[current.head] = '1'; return { ...current, tape, step: current.step + 1 } }
+      if (action === 'BLANK') { delete tape[current.head]; return { ...current, tape, step: current.step + 1 } }
+      return current
+    })
+  }, [step])
   useEffect(() => { if (!running || machine.halted) return; const timer = window.setInterval(step, 1000 / speed); return () => window.clearInterval(timer) }, [running, machine.halted, speed, step])
-  useEffect(() => { const onKey = (event: KeyboardEvent) => { const pianoIndex = keyboardMap.indexOf(event.key.toLowerCase()); if (pianoIndex >= 0) { if (!event.repeat) { setPressedKey(pianoIndex); playTone(pianoFrequency(41 + pianoIndex), .45); window.setTimeout(() => setPressedKey(null), 220) }; return }; if (event.code === 'Space') { event.preventDefault(); setRunning((value) => !value) }; if (event.shiftKey && event.key.toLowerCase() === 's') step(); if (event.shiftKey && event.key.toLowerCase() === 'r') reset() }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [reset, step])
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { const pianoIndex = keyboardMap.indexOf(event.key.toLowerCase()); if (pianoIndex >= 0) { if (!event.repeat) activateKey(pianoIndex); return }; if (event.code === 'Space') { event.preventDefault(); setRunning((value) => !value) }; if (event.shiftKey && event.key.toLowerCase() === 's') step(); if (event.shiftKey && event.key.toLowerCase() === 'r') reset() }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [activateKey, reset, step])
   const cells = useMemo(() => Array.from({ length: 13 }, (_, index) => machine.head - 6 + index), [machine.head]); const activeRule = machine.lastTransition; const displayState = machine.halted ? 'HALT' : machine.state.toUpperCase()
   const choosePreset = (next: Preset) => { setPreset(next); reset(next) }; const editCell = (position: number) => setMachine((current) => { const currentSymbol = current.tape[position] ?? 'blank'; const nextSymbol: TapeSymbol = currentSymbol === 'blank' ? '0' : currentSymbol === '0' ? '1' : 'blank'; const tape = { ...current.tape }; if (nextSymbol === 'blank') delete tape[position]; else tape[position] = nextSymbol; return { ...current, tape } })
   return <main className="app-shell">
