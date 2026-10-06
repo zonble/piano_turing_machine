@@ -1,4 +1,5 @@
 :root { --ink: #e9e3d4; --muted: #a9ae9c; --line: rgba(233,227,212,.2); --paper: #d2b27e; --paper-dark: #b58d58; --green: #202922; --green-2: #2c382e; --orange: #e47745; --cream: #f3ead8; }
+.hero-copy { display: none; }
 .app-shell { max-width: 1320px; margin: auto; padding: 32px 48px 24px; overflow: hidden; background: radial-gradient(circle at 50% -10%, #394a3a 0, transparent 42%), var(--green); min-height: 100vh; }
 .masthead, .section-label, .tape-caption, .piano-legend, footer, .hand-labels { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .masthead { border-bottom: 1px solid var(--line); padding-bottom: 22px; } .brand-mark { width: 46px; height: 46px; border: 1px solid var(--orange); color: var(--orange); display: grid; place-items: center; position: relative; font-size: 11px; letter-spacing: -1px; } .brand-mark i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); top: 8px; right: 8px; }.masthead > div:nth-child(2) { flex: 1; }
