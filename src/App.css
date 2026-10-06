@@ -98,3 +98,5 @@ footer { padding-top: 62px; font-size: 9px; } footer span:nth-child(2) { color: 
   .preset small { font-size: 10px; }
   .rules-panel .table-wrap { height: calc(100% - 34px); max-height: none; overflow: auto; }
 }
+
+.tape-caption .value-breakdown { display: block; color: #d6c198; margin: 2px 0 0 8px; font-size: 8px; letter-spacing: .04em; }

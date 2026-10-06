@@ -34,3 +34,4 @@ export function executeStep(snapshot: MachineSnapshot, preset: Preset): MachineS
   return { tape, head, state: transition.to, step: snapshot.step + 1, halted: transition.to === 'halt', lastTransition: transition }
 }
 export function tapeValue(tape: Record<number, TapeSymbol>) { const keys = Object.keys(tape).map(Number).sort((a, b) => a - b); if (!keys.length) return '0'; return keys.map((key) => tape[key] === '1' ? '1' : '0').join('').replace(/^0+/, '') || '0' }
+export function tapeNumber(tape: Record<number, TapeSymbol>) { return Number.parseInt(tapeValue(tape), 2) || 0 }
