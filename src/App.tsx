@@ -7,13 +7,14 @@ import './App.css'
 const keyNames = ['F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B', 'C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B', 'C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B', 'C', 'C♯', 'D', 'D♯', 'E']
 const blackKeys = new Set(['F♯', 'G♯', 'A♯', 'C♯', 'D♯'])
 const whiteKeyIndices = keyNames.map((name, index) => blackKeys.has(name) ? -1 : index).filter((index) => index >= 0)
-const whitePurposes = ['STATE 0', 'STATE 1', 'STATE 2', 'STATE 3', 'STATE 4', 'STATE 5', 'HALT', 'READ 0', 'READ 1', 'MOVE LEFT', 'MOVE RIGHT', 'WRITE 0', 'WRITE 1', 'BLANK', 'STEP', 'CARRY', 'COMPARE', 'STATE CHANGE', 'FINAL CHORD', 'RESERVED', 'RESERVED', 'RESERVED']
+const whitePurposes = ['STATE 0', 'STATE 1', 'STATE 2', 'STATE 3', 'STATE 4', 'STATE 5', 'HALT', 'READ 0', 'READ 1', 'MOVE LEFT', 'MOVE RIGHT', 'WRITE 0', 'WRITE 1', 'BLANK', 'WRITE SEPARATOR', 'STEP', 'PLAY', 'STATE CHANGE', 'FINAL CHORD', 'RESERVED', 'RESERVED', 'RESERVED']
 const whiteKeyboardMap = ['z', 'x', 'c', 'v', 'b', 'n', 'm', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 'a', 's', 'd', 'f', 'g']
 const keyboardMap = keyNames.map((_, index) => whiteKeyboardMap[whiteKeyIndices.indexOf(index)] ?? '—')
 const keyPurpose = (index: number) => { const whiteIndex = whiteKeyIndices.indexOf(index); return whiteIndex >= 0 ? whitePurposes[whiteIndex] : 'MELODY ONLY' }
 const operationForPreset = (item: Preset): OperationId => item.operation ?? item.id as OperationId
 const binaryOperation = (operation: OperationId) => operation === 'add' || operation === 'subtract' || operation === 'multiply' || operation === 'divide'
 const operationLabel = (operation: OperationId) => ({ increment: '加一', shift: '左移', add: '加法', subtract: '減法', multiply: '乘法', divide: '除法', palindrome: '迴文檢查' }[operation])
+const defaultPreset = presets.find((item) => item.id === 'addition') ?? presets[0]
 
 const transitionPurposes = (rule: MachineSnapshot['lastTransition']) => {
   if (!rule) return []
@@ -28,9 +29,9 @@ const transitionPurposes = (rule: MachineSnapshot['lastTransition']) => {
 }
 
 function App() {
-  const [preset, setPreset] = useState<Preset>(presets[0])
-  const [machine, setMachine] = useState<MachineSnapshot>(() => resetMachine(presets[0]))
-  const [inputDraft, setInputDraft] = useState(() => tapeInput(presets[0].initialTape))
+  const [preset, setPreset] = useState<Preset>(defaultPreset)
+  const [machine, setMachine] = useState<MachineSnapshot>(() => ({ ...resetMachine(defaultPreset), tape: {} }))
+  const [inputDraft, setInputDraft] = useState('')
   const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState(4)
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
@@ -94,6 +95,7 @@ function App() {
     playTone(pianoFrequency(41 + index), .45)
     window.setTimeout(() => setPressedKey(null), 220)
     const action = keyPurpose(index)
+    if (action === 'PLAY') { if (validation.ok) setRunning((value) => !value); return }
     if (action === 'STEP') { step(); return }
     setMachine((current) => {
       const tape = { ...current.tape }
@@ -102,9 +104,10 @@ function App() {
       if (action === 'WRITE 0') { tape[current.head] = '0'; setInputDraft(tapeInput(tape)); return { ...current, tape, step: current.step + 1 } }
       if (action === 'WRITE 1') { tape[current.head] = '1'; setInputDraft(tapeInput(tape)); return { ...current, tape, step: current.step + 1 } }
       if (action === 'BLANK') { delete tape[current.head]; setInputDraft(tapeInput(tape)); return { ...current, tape, step: current.step + 1 } }
+      if (action === 'WRITE SEPARATOR') { tape[current.head] = 'separator'; setInputDraft(tapeInput(tape)); return { ...current, tape, step: current.step + 1 } }
       return current
     })
-  }, [step])
+  }, [step, validation.ok])
 
   const togglePlay = () => {
     if (!running && !validation.ok) return
