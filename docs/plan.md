@@ -1,123 +1,374 @@
-# 鋼琴圖靈機 (Piano Turing Machine) 企劃與規格書
+# Piano Turing Machine
 
-## 1. 專案願景與核心概念
+## 1. 核心目標
 
-自動鋼琴（Player Piano）在歷史上採用單向捲動的打孔紙捲（Piano Roll）來驅動機械彈奏。如果我們將紙捲改為**可雙向捲動、可讀取、可寫入**的 Tape，並將鋼琴按鍵賦予讀寫與狀態轉移的邏輯，鋼琴就昇華為一台「通用圖靈機（Universal Turing Machine）」。
+把一台 player piano 想像成一台純機械計算機：紙捲是 Tape，讀寫頭沿著 Tape 移動，鋼琴鍵是操作機器的機械控制，狀態齒輪保存機器目前的控制狀態。
 
-每一次數學運算，都是一首具備對位與極簡主義律動的鋼琴曲；運算停機（HALT）之時，正是樂章終曲。
+這不是一個「有鋼琴外觀的計算器」，而是一台讓人可以看見、聽見、並且親手操作計算過程的機器。
 
----
+第一個必須跑通的 use case 是：
 
-## 2. 核心功能與互動架構
+> 從空白 Tape 開始，只用鋼琴輸入 `1#1`，執行二進位加法，得到 `10`。
 
-### 2.1 雙模互動架構
-* **自動演奏運算模式（Auto Computation Mode）**：
-  * 使用者選取演算法範例（或自訂初始 Tape），按下「播放」。
-  * 圖靈機讀取 Tape，命中的轉移規則會自動驅動對應的鋼琴鍵下沉並發出琴聲。
-  * 支援 **Play / Pause / Step（單步）/ Reset** 以及 **速度調節（BPM / Steps per sec）**。
-* **手動彈奏 / 探索模式（Interactive Piano Mode）**：
-  * 使用者可自由點擊或使用電腦鍵盤彈奏鋼琴，體驗琴聲與即時觸發的 Tape 操作或狀態變化。
-  * 可直接點擊 Tape 上的方格，隨意切換或編輯初始 0 / 1 / 空白狀態。
-
-### 2.2 純機械狀態保存
-* Tape 保存資料，不保存圖靈機的控制狀態。
-* 純機械版本使用一個具棘爪定位的「狀態輪」保存目前 State；每個凹槽代表 `q0`、`q1`、`q2` 等離散狀態，另設一個鎖定的 `HALT` 位置。
-* 齒輪只負責傳遞動力；狀態由狀態輪的角度與棘爪鎖定位置保存。
-* 使用凸輪鼓或凸輪／槓桿邏輯根據「目前 State + Tape 讀取符號」決定寫入、Head 移動與下一個 State。
-* 為了讓機構可靠，State 跳轉可採用「先回到 q0，再以棘輪推進到目標 State」的 reset-to-zero 機制。
+所有 UI 和程式設計都要能回到這個 use case 驗證。
 
 ---
 
-## 3. 鋼琴鍵盤與圖靈機映射體系（雙手結構）
+## 2. 機器架構
 
-鍵盤採用 **3 個八度（37 鍵，F2 ～ F5）**，模擬古典鋼琴演奏中的雙手對位結構：
+```text
+┌──────────────┬──────────────────────┬──────────────────┐
+│ 狀態齒輪     │ Tape + Head          │ 算術卡片         │
+│              │                      │                  │
+│ q0 q1 q2 ... │ 1  #  1              │ ADD              │
+└──────────────┴──────────────────────┴──────────────────┘
 
-```
-[         左手區：低音部 (F2 ~ E3)         ]  [          右手區：高音部 (F3 ~ F5)          ]
-[ 狀態轉移 (State Transition / Bassline)   ]  [ Tape 讀寫與移動 (Tape Action / Melody)      ]
+┌─────────────────────────────────────────────────────────┐
+│                    Piano Keyboard                      │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 3.1 左手部：狀態低音（Bass / State Representation）
-* 對應圖靈機的內部狀態（State 0, State 1, State 2, ..., Halt）。
-* 每當狀態發生改變時，左手低音鍵沉下，敲響厚重的低音和弦或根音，營造結構性律動。
-* 特殊狀態（如 HALT 停機）有對應的終止和弦音。
+### 2.1 Tape
 
-### 3.2 右手部：動作旋律（Melody / Tape Actions）
-* 對應圖靈機讀寫頭（Head）的具體微操作：
-  * **Move Left**（例如低階高音，如 G3）
-  * **Move Right**（例如高階高音，如 C4）
-  * **Write 0**（特定白鍵音）
-  * **Write 1**（特定白鍵音）
-  * **Read 0 / Read 1**（配合輕巧裝飾音或黑鍵）
-* 當計算來回循環時，右手會形成如 Steve Reich / Philip Glass 般的極簡主義琶音與節奏。
+Tape 保存資料，不保存控制狀態。每個位置可以保存：
+
+```text
+0 / 1 / # / blank
+```
+
+Tape 需要支援：
+
+- 讀取目前 Head 位置的符號
+- 寫入符號
+- 向左或向右移動 Head
+- 顯示目前 Head 位置
+- 顯示 Tape 的原始符號和解碼後的數值
+
+### 2.2 State register
+
+機器需要一個獨立的 State register。State 不寫在 Tape 上。
+
+軟體模型中，State register 是：
+
+```ts
+currentState: StateId
+```
+
+純機械模型中，State register 是一個具棘爪定位的狀態輪：
+
+- 每個凹槽代表一個 State，例如 `q0`、`q1`、`q2`
+- 另一個鎖定位置代表 `HALT`
+- 棘爪固定目前位置，讓機器能「記住」State
+- 齒輪只負責傳遞動力，不直接代表 State
+- State 跳轉可以採用 reset-to-zero，再以棘輪推進到目標 State
+
+### 2.3 Operation card
+
+Operation card 代表目前載入的計算規則，例如：
+
+```text
+ADD
+Input: A#B
+Output: A+B
+```
+
+純機械版本可把它實作成：
+
+- 可替換的凸輪鼓
+- 一組 operation selector
+- 一張帶孔的規則卡
+
+Operation card 決定 transition logic，但不取代 State register。
+
+### 2.5 加法齒輪的可理解說明
+
+加法不能只透過 transition table 呈現。Operation card 必須同時提供三層說明：
+
+1. **一句話原理**：加法齒輪從右到左逐位相加，並用進位栓保存 carry。
+2. **機械部件圖**：顯示左輸入齒輪 A、右輸入齒輪 B、加法輪、結果齒輪與進位栓之間的關係。
+3. **同步的逐步解剖**：每次 STEP 或 PLAY 時顯示 A bit、B bit、Carry、Sum、寫入結果與下一個 Head movement。
+
+以 `1 + 1` 為例，說明應該呈現：
+
+```text
+A = 1
+B = 1
+Carry = 0
+
+1 + 1 + 0 = 10
+→ 寫入 0
+→ Carry 設為 1
+→ 向左移動一格
+```
+
+下一步再把 carry 寫成最高位的 `1`，最後進入 `HALT`，得到 `10₂`。
+
+Transition table 是工程檢查視圖；加法齒輪的逐步解剖才是使用者理解運算原理的主要視圖。
+
+### 2.4 Transition logic
+
+每一步由以下條件決定：
+
+```text
+(Current State, Tape Symbol)
+        ↓
+(Write Symbol, Head Direction, Next State)
+```
+
+例如：
+
+```text
+(q0, 1) → (write 0, move right, q1)
+```
+
+純機械版本由 Tape reader、凸輪、槓桿和狀態輪共同完成這個決策。
 
 ---
 
-## 4. 聲音引擎（Audio Engine）
+## 3. `1 + 1` 的完整 use case
 
-* **技術實現**：基於 Web Audio API / Tone.js。
-* **音色取樣**：載入高品質、輕量級的原聲鋼琴取樣（Acoustic Piano Samples / SoundFont）。
-* **音樂表現**：
-  * 支援 Polyphony（複音演奏，左右手可同時發聲）。
-  * 琴鍵下沉有擊弦力度（Velocity）感與自然釋放衰減（Release / Decay）。
+### 3.1 初始狀態
+
+新進入機器時：
+
+```text
+Operation: ADD
+Tape: 空白
+Head: 位置 0
+State: INPUT
+```
+
+使用者不需要先選 sample，也不需要先填表單。
+
+### 3.2 用鋼琴建立輸入
+
+用 Tape action 區的白鍵輸入：
+
+```text
+WRITE 1
+MOVE RIGHT
+WRITE #
+MOVE RIGHT
+WRITE 1
+```
+
+Tape 變成：
+
+```text
+[ 1 ][ # ][ 1 ]
+  ↑
+```
+
+### 3.3 執行計算
+
+按下鋼琴上的 `PLAY` 後，機器以 clock 逐步執行 transition：
+
+```text
+INPUT → SCAN → ADD → CARRY → WRITE → HALT
+```
+
+對 `1 + 1` 而言：
+
+```text
+1 + 1
+→ 寫入 0
+→ 產生 carry 1
+→ 寫入更高位
+→ 得到 10
+→ HALT
+```
+
+最後畫面和機器狀態應該是：
+
+```text
+Tape: 10
+State: HALT
+Binary: 10₂
+Decimal: 2₁₀
+Octal: 2₈
+```
 
 ---
 
-## 5. 視覺風格與 UI/UX 設計
+## 4. 鋼琴鍵盤功能映射
 
-以 **「19 世紀末自動鋼琴打孔紙捲（Player Piano Roll）+ 精密機械」** 為主視覺風格：
+鍵盤以雙手的空間分工表達機器結構：
 
-### 5.1 上方：打孔紙捲（Player Piano Roll & Head）
-* **質感**：泛黃復古牛皮紙質、網格微紋理。
-* **符號打孔**：`0` 與 `1` 呈現為機械穿孔圓孔與穿透光影（未穿孔為空白格）。
-* **讀寫頭（Head）**：金屬黃銅質感探針指針，指示目前讀取的 Cell，讀寫與移動時伴隨步進動畫。
-* **直接互動**：使用者可滑鼠點擊任意格快速改寫資料。
+```text
+低音區                 中音區                    高音區
+STATE                  TAPE ACTION              MACHINE CONTROL
+```
 
-### 5.2 中間：37 鍵互動鋼琴鍵盤（Piano Keyboard）
-* 擬真黑白鋼琴鍵盤，具備陰影與按壓下沉動畫。
-* 琴鍵上方具備發光標籤（例如標註對應的 State 名稱或 Action 動作）。
-* 自動演奏時，命中的琴鍵會點亮並觸發漣漪光暈效果。
+### 4.1 左手／低音：State
 
-### 5.3 下方：狀態儀表與轉移規則查看器（Inspector & Controls）
-* **控制面板**：播放 / 暫停、單步向前、重置、速度滑桿（BPM）、總步數（Step Count）。
-* **狀態儀表**：目前 State、當前讀取值、目前 Tape 數值解碼（二進位轉十進位數字）。
-* **轉移規則查看器（Transition Table Inspector）**：
-  * 列表呈現當前題目的圖靈機規則表（$\delta(Q, \Sigma) \to (Q', \Sigma', \text{Dir})$）。
-  * 每次執行時，**即時高亮目前被觸發的那一行規則**，讓使用者一目了然機器如何決策。
+左手低音區操作 State register：
+
+```text
+STATE 0 → 設定 q0
+STATE 1 → 設定 q1
+STATE 2 → 設定 q2
+STATE 3 → 設定 q3
+STATE 4 → 設定 q4
+STATE 5 → 設定 q5
+HALT    → 鎖定停機狀態
+```
+
+自動執行時，State 由 transition rule 改變；手動探索時，State key 可以直接轉動狀態齒輪。
+
+### 4.2 中音／右手前段：Tape action
+
+```text
+WRITE 0
+WRITE 1
+WRITE SEPARATOR (#)
+BLANK
+MOVE LEFT
+MOVE RIGHT
+```
+
+這些鍵直接作用在 Head 所在的 Tape cell。
+
+### 4.3 高音／右手後段：Machine control
+
+```text
+STEP  → 執行一個 transition
+PLAY  → 連續執行 transition
+RESET → 重設 State、Head、Step，但保留 Tape
+```
+
+`PLAY` 必須是鋼琴鍵，不可以只存在於外部 HTML 按鈕。
+
+### 4.4 黑鍵
+
+黑鍵不承擔主要輸入，避免使用者必須記住複雜的黑鍵配置。黑鍵可以用於：
+
+- READ 0 / READ 1 條件
+- modifier
+- transition 的輔助聲部
+- 純音樂演奏
+
+所有主要計算動作都應優先放在白鍵上。
+
+### 4.5 鍵盤標示
+
+每個有計算功能的琴鍵必須同時顯示：
+
+- 琴鍵名稱
+- 功能名稱
+- 電腦鍵盤映射
+- 按下後影響的機器部件
+
+例如：
+
+```text
+Y
+WRITE 1
+Tape / Head cell
+```
 
 ---
 
-## 6. 內建演算法範例庫（Built-in Presets）
+## 5. UI 版面
 
-系統將內建以下 5 個經典圖靈機程序，附帶說明與初始資料：
+### 上方：機器本體
 
-1. **二進位自增 1（Binary Incrementer）**
-   * *說明*：將紙帶上的二進位數字加 1（例如 `1011` $\to$ `1100`）。
-   * *音樂特色*：進位時連續向左掃音，極具律動感。
-2. **二進位加法（Binary Addition）**
-   * *說明*：計算兩個二進位數的總和（例如 `3 + 5 = 8`）。
-   * *音樂特色*：兩數之間來回搬移資料，旋律穿梭反覆。
-3. **忙碌海狸（Busy Beaver - 3/4 State）**
-   * *說明*：從全空白紙帶開始，在有限步內打出最多的 1 並停機。
-   * *音樂特色*：高度複雜的非週期循環節奏，宛如即興現代古典樂。
-4. **迴文檢查（Palindrome Checker）**
-   * *說明*：檢查輸入字串是否對稱（例如 `1001`）。
-   * *音樂特色*：讀寫頭往返兩端對比，左右跳躍的對稱音型。
-5. **乘二運算 / 位元左移（Multiply by 2 / Bit Shift）**
-   * *說明*：在末端補 0 並向左整理符號。
-   * *音樂特色*：單向推動的琶音效果。
+```text
+[State register] [Tape + Head] [Operation card]
+```
+
+三個區域必須互相對齊：
+
+- State register 顯示目前 State
+- Tape 顯示資料和 Head
+- Operation card 顯示 ADD、輸入格式與規則摘要
+
+### 下方：Piano
+
+鋼琴是主要操作介面，不放在進階區，也不隱藏在頁面最下方。
+
+鋼琴下方顯示一行當前操作說明，例如：
+
+```text
+WRITE 1 → MOVE RIGHT → WRITE # → MOVE RIGHT → WRITE 1 → PLAY
+```
+
+### 輔助資訊
+
+以下內容可以收進 Advanced，但不能取代主流程：
+
+- 完整 transition table
+- 完整 key map
+- raw Tape positions
+- event history
+- 機械結構細節
 
 ---
 
-## 7. 前端技術棧與模組規劃
+## 6. 計算模式
 
-* **核心技術棧**：
-  * **Bundler & Framework**：Vite + React 18+ + TypeScript
-  * **Styling**：Tailwind CSS + Lucide Icons + 自訂復古紙捲/黃銅金屬 CSS 紋理
-  * **Audio**：Tone.js（Sampler 加載真實原聲鋼琴取樣）
-* **模組劃分**：
-  * `core/turing/`：圖靈機核心引擎（Tape, Head, State Machine, Step Execution, Presets）。
-  * `core/audio/`：聲音引擎（Tone.js Sampler 管理、音高映射、觸鍵與釋音）。
-  * `components/tape/`：打孔紙捲渲染元件、探針讀寫頭動畫、單元格點擊編輯。
-  * `components/piano/`：37 鍵鋼琴鍵盤、按鍵互動事件、音域映射標示。
-  * `components/inspector/`：轉移規則表高亮顯示、控制按鈕組、速度滑桿、狀態儀表。
+### 6.1 Manual / Explore
+
+使用者透過鋼琴直接操作：
+
+- 改變 Tape
+- 移動 Head
+- 改變 State
+- 執行單步
+- 執行播放
+
+### 6.2 Auto computation
+
+機器依照 Operation card 的 transition rules 自動執行。每一步需要同步顯示：
+
+- Current State
+- 讀到的 Tape symbol
+- 寫入的 symbol
+- Head movement
+- Next State
+- 對應的鋼琴鍵與聲音
+
+---
+
+## 7. 錯誤與停機
+
+機器不得靜默失敗。至少需要處理：
+
+- 缺少 `#`
+- 超過一個 `#`
+- 空 operand
+- 非法 Tape symbol
+- 除以零
+- 不存在的 transition
+- 已經 HALT 後再次 PLAY
+
+錯誤應該顯示在 State／Operation 區域，並說明使用者下一步能做什麼。
+
+---
+
+## 8. 開發順序
+
+1. 定義 State register、Tape、Head、Transition 的資料模型。
+2. 讓 `1#1` 可以由 Piano action 建立。
+3. 讓 Piano 的 PLAY 執行完整 transition。
+4. 完成 `1 + 1 → 10` 的逐步計算和 HALT。
+5. 顯示 State register、Tape、Operation card 三個上方模組。
+6. 完成白鍵功能標示和實體鍵盤映射。
+7. 再加入其他 operation 和 sample。
+8. 最後加入 transition inspector、event history 和機械細節。
+
+任何新功能都必須先確認不會破壞第一個 use case：
+
+> 新使用者能否只用鋼琴完成 `1 + 1`？
+
+---
+
+## 9. 明確不採用的方向
+
+- 不把 Piano 當作裝飾性的音樂 UI。
+- 不把 State 寫進 Tape。
+- 不要求使用者先理解 transition table 才能開始。
+- 不讓 PLAY 只存在於 HTML 控制按鈕。
+- 不先擴充大量 operation，再補核心的 `1 + 1` 體驗。
+- 不把完整的馮紐曼式 Store、PC、IR 當成第一版純機械架構。
+
+第一版選擇 Tape 型、有限狀態、凸輪控制的機械架構；算術模組可以逐步加入，但必須服務於可觀察、可操作的鋼琴計算體驗。
