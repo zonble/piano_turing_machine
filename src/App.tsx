@@ -75,7 +75,8 @@ function App() {
   const choosePreset = (next: Preset) => {
     setPreset(next)
     setRunning(false)
-    setMachine((current) => ({ ...current, state: next.startState, step: 0, halted: false, lastTransition: undefined, program: undefined }))
+    setMachine(resetMachine(next))
+    setInputDraft(tapeInput(next.initialTape))
   }
 
   const editCell = (position: number) => setMachine((current) => {
