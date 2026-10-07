@@ -35,6 +35,7 @@ footer { padding-top: 62px; font-size: 9px; } footer span:nth-child(2) { color: 
   .tape-cell .position { top: 5px; }
   .tape-cell .needle { top: -10px; }
   .piano-panel { padding-top: 14px; }
+  .operation-workspace { grid-column: 1 / -1; }
   .piano-wrap { margin-top: 9px; padding: 13px 18px 10px; }
   .piano { padding: 8px 6px 6px; }
   .keybed { height: 104px; }
