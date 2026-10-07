@@ -92,8 +92,12 @@ footer { padding-top: 62px; font-size: 9px; } footer span:nth-child(2) { color: 
   .app-shell { grid-template-columns: minmax(0, 1fr) 286px; grid-template-rows: auto auto auto auto auto minmax(126px, 1fr); column-gap: 28px; }
   .masthead { grid-column: 1 / -1; }
   .hero-copy, .tape-panel, .piano-panel, .control-grid { grid-column: 1; }
+  .operation-workspace { display: contents; }
+  .operation-workspace .operation-editor { grid-column: 1; grid-row: 5; }
+  .operation-workspace .preset-panel { grid-column: 2; grid-row: 2 / 7; min-height: 0; overflow: hidden; border-top: 1px solid var(--line); }
+  .operation-workspace .result-card { grid-column: 1; grid-row: 6; }
   .lower-grid { display: contents; }
-  .lower-grid .preset-panel { grid-column: 2; grid-row: 2 / 7; min-height: 0; overflow: hidden; border-top: 1px solid var(--line); }
+  .lower-grid .rules-panel { grid-column: 1; grid-row: 7; }
   .lower-grid .rules-panel { grid-column: 1; grid-row: 6; min-height: 0; overflow: hidden; }
   .preset-list { height: calc(100% - 35px); max-height: none; overflow: auto; }
   .preset { padding: 14px 6px; }
