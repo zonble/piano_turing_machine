@@ -20,8 +20,8 @@ footer { padding-top: 62px; font-size: 9px; } footer span:nth-child(2) { color: 
 
 /* Desktop instrument view: everything stays inside one viewport. */
 @media (min-width: 761px) {
-  html, body, #root { height: 100%; overflow: hidden; }
-  .app-shell { height: 100svh; min-height: 620px; padding: 14px 32px 10px; display: grid; grid-template-rows: auto auto auto auto auto minmax(126px, 1fr); align-content: stretch; }
+  html, body, #root { min-height: 100%; overflow: auto; }
+  .app-shell { min-height: 100svh; padding: 14px 32px 10px; display: grid; grid-template-rows: auto auto auto auto auto minmax(126px, 1fr); align-content: start; overflow-y: auto; }
   .masthead { flex: 0 0 auto; padding-bottom: 12px; }
   .brand-mark { width: 37px; height: 37px; }
   .hero-copy { padding: 20px 5% 17px; }
