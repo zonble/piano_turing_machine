@@ -35,6 +35,7 @@ describe('piano-first machine', () => {
 
   it('exposes the simple physical keyboard mapping', () => {
     expect(pianoActions.y).toBe('write1')
+    expect(pianoActions.z).toBe('setState0')
     expect(pianoActions.r).toBe('moveRight')
     expect(pianoActions.i).toBe('writeSeparator')
     expect(pianoActions.p).toBe('play')

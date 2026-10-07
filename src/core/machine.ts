@@ -1,8 +1,8 @@
 import { parseOperationInput } from './operations'
 
 export type TapeSymbol = '0' | '1' | 'separator'
-export type StateId = 'INPUT' | 'SCAN' | 'ADD' | 'CARRY' | 'WRITE' | 'HALT'
-export type PianoAction = 'write0' | 'write1' | 'writeSeparator' | 'blank' | 'moveLeft' | 'moveRight' | 'step' | 'play' | 'stop' | 'reset'
+export type StateId = 'INPUT' | 'SCAN' | 'ADD' | 'CARRY' | 'WRITE' | 'HALT' | 'q0' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5'
+export type PianoAction = 'setState0' | 'setState1' | 'setState2' | 'setState3' | 'setState4' | 'setState5' | 'write0' | 'write1' | 'writeSeparator' | 'blank' | 'moveLeft' | 'moveRight' | 'step' | 'play' | 'stop' | 'reset'
 export type MachineResult = { binary: string; decimal: number; octal: string }
 export type MachineEvent = { state: StateId; message: string; action?: PianoAction }
 export type MachineSnapshot = {
@@ -20,6 +20,12 @@ export type MachineSnapshot = {
 }
 
 export const pianoActions: Record<string, PianoAction> = {
+  z: 'setState0',
+  x: 'setState1',
+  c: 'setState2',
+  v: 'setState3',
+  b: 'setState4',
+  n: 'setState5',
   t: 'write0',
   y: 'write1',
   i: 'writeSeparator',
@@ -33,6 +39,12 @@ export const pianoActions: Record<string, PianoAction> = {
 }
 
 export const pianoActionLabels: Record<PianoAction, string> = {
+  setState0: 'q0',
+  setState1: 'q1',
+  setState2: 'q2',
+  setState3: 'q3',
+  setState4: 'q4',
+  setState5: 'q5',
   write0: '0',
   write1: '1',
   writeSeparator: '#',
@@ -71,6 +83,7 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
   if (action === 'reset') return { ...snapshot, state: 'INPUT', head: 0, step: 0, carry: 0, halted: false, result: undefined, error: undefined, lastEvent: { state: 'INPUT', message: 'Machine reset; Tape preserved.', action } }
   if (action === 'stop') return { ...snapshot, halted: true, state: 'HALT', lastEvent: { state: 'HALT', message: 'Stopped by operator.', action } }
   if (snapshot.halted) return snapshot
+  if (action.startsWith('setState')) { const state = `q${action.slice(-1)}` as StateId; return { ...snapshot, state, error: undefined, lastEvent: { state, message: `State register set to ${state}.`, action } } }
   const tape = { ...snapshot.tape }
   if (action === 'write0') tape[snapshot.head] = '0'
   if (action === 'write1') tape[snapshot.head] = '1'

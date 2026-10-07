@@ -8,7 +8,8 @@ const blackKeys = new Set(['F♯', 'G♯', 'A♯', 'C♯', 'D♯'])
 const whiteKeyIndices = keyNames.map((name, index) => blackKeys.has(name) ? -1 : index).filter((index) => index >= 0)
 const whiteKeyboardMap = ['z', 'x', 'c', 'v', 'b', 'n', 'm', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 'a', 's', 'd', 'f', 'g']
 const whiteLabels = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'HALT', '·', '·', '←', '→', '0', '1', '□', '#', '⏭', '▶', '⏹', '↺', '', '', '']
-const stateNames: MachineSnapshot['state'][] = ['INPUT', 'SCAN', 'ADD', 'CARRY', 'WRITE', 'HALT']
+const stateNames = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'HALT'] as const
+const stateRegister = (state: MachineSnapshot['state']) => state === 'HALT' ? 'HALT' : state === 'INPUT' ? 'q0' : state === 'SCAN' ? 'q1' : state === 'ADD' ? 'q2' : state === 'CARRY' ? 'q3' : state === 'WRITE' ? 'q4' : state
 const tapePositions = (head: number) => Array.from({ length: 13 }, (_, index) => head - 6 + index)
 
 function App() {
@@ -62,7 +63,7 @@ function App() {
     <header className="masthead"><div className="brand-mark">PTM<i /></div><div><p className="eyebrow">A MECHANICAL COMPUTING INSTRUMENT</p><h1>Piano <em>Turing</em> Machine</h1></div><div className={`machine-status ${running ? 'live' : ''}`}><span />{running ? 'PLAYING' : machine.halted ? 'HALT' : 'READY'}</div></header>
 
     <section className="machine-board">
-      <section className="state-module module"><div className="module-heading"><span>STATE GEAR</span><span>CONTROL MEMORY</span></div><div className="state-wheel">{stateNames.map((state) => <div className={`state-slot ${machine.state === state ? 'current' : ''}`} key={state}><i />{state}</div>)}</div><p className="module-note">目前狀態由狀態輪保存，不寫入 Tape。</p></section>
+      <section className="state-module module"><div className="module-heading"><span>STATE GEAR</span><span>CONTROL MEMORY</span></div><div className="state-wheel">{stateNames.map((state) => <div className={`state-slot ${stateRegister(machine.state) === state ? 'current' : ''}`} key={state}><i />{state}</div>)}</div><p className="module-note">目前狀態由狀態輪保存，不寫入 Tape。</p></section>
       <section className="tape-module module"><div className="module-heading"><span>TAPE + HEAD</span><span>{currentSymbol} AT {machine.head >= 0 ? '+' : ''}{machine.head}</span></div><div className="tape-window"><div className="tape-cells">{cells.map((position) => <div className={`tape-cell ${position === machine.head ? 'selected' : ''}`} key={position}><span className="position">{position}</span><strong>{machine.tape[position] === 'separator' ? '#' : machine.tape[position] ?? '□'}</strong>{position === machine.head && <span className="needle">⌄</span>}</div>)}</div></div><div className="tape-readout"><span>RAW <b>{tapeText(machine.tape) || 'blank'}</b></span><span>HEAD <b>{machine.head}</b></span><span>STEP <b>{String(machine.step).padStart(3, '0')}</b></span></div></section>
       <section className="operation-module module"><div className="module-heading"><span>ARITHMETIC CARD</span><span>LOADED</span></div><div className="card-face"><div className="card-hole">+</div><div><strong>ADD</strong><small>從右到左逐位相加</small></div></div><div className="gear-explanation"><div><span>A bit</span><b>{machine.state === 'CARRY' ? '1' : '—'}</b></div><div><span>B bit</span><b>{machine.state === 'CARRY' ? '1' : '—'}</b></div><div><span>Carry</span><b>{machine.carry}</b></div><div><span>Next</span><b>{machine.state}</b></div></div><p className="module-note">加法輪讀取兩個 bit，寫回 sum，並用 carry 齒輪保存進位。</p></section>
     </section>
