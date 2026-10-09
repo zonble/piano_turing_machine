@@ -80,18 +80,22 @@ function invalidInput(snapshot: MachineSnapshot): MachineSnapshot {
 }
 
 export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction): MachineSnapshot {
-  if (action === 'reset') return { ...snapshot, state: 'INPUT', head: 0, step: 0, carry: 0, halted: false, result: undefined, error: undefined, lastEvent: { state: 'INPUT', message: 'Machine reset; Tape preserved.', action } }
+  if (action === 'reset') {
+    const restartingAfterHalt = snapshot.halted
+    return { ...snapshot, tape: restartingAfterHalt ? {} : snapshot.tape, state: 'INPUT', head: 0, step: 0, carry: 0, halted: false, result: undefined, error: undefined, program: undefined, lastEvent: { state: 'INPUT', message: restartingAfterHalt ? 'Result cleared; enter a new Tape input.' : 'Machine reset; Tape preserved.', action } }
+  }
   if (action === 'stop') return { ...snapshot, halted: true, state: 'HALT', lastEvent: { state: 'HALT', message: 'Stopped by operator.', action } }
-  if (snapshot.halted) return snapshot
   if (action.startsWith('setState')) { const state = `q${action.slice(-1)}` as StateId; return { ...snapshot, state, error: undefined, lastEvent: { state, message: `State register set to ${state}.`, action } } }
   const tape = { ...snapshot.tape }
+  const editingHaltedTape = snapshot.halted && ['write0', 'write1', 'writeSeparator', 'blank', 'moveLeft', 'moveRight'].includes(action)
+  if (snapshot.halted && !editingHaltedTape) return snapshot
   if (action === 'write0') tape[snapshot.head] = '0'
   if (action === 'write1') tape[snapshot.head] = '1'
   if (action === 'writeSeparator') tape[snapshot.head] = 'separator'
   if (action === 'blank') delete tape[snapshot.head]
   if (action === 'moveLeft' || action === 'moveRight' || action === 'write0' || action === 'write1' || action === 'writeSeparator' || action === 'blank') {
     const nextHead = action === 'moveLeft' ? snapshot.head - 1 : action === 'moveRight' ? snapshot.head + 1 : snapshot.head
-    return { ...snapshot, tape, head: nextHead, error: undefined, lastEvent: { state: snapshot.state, message: pianoActionLabels[action], action } }
+    return { ...snapshot, tape, head: nextHead, state: editingHaltedTape ? 'INPUT' : snapshot.state, halted: false, result: editingHaltedTape ? undefined : snapshot.result, program: editingHaltedTape ? undefined : snapshot.program, error: undefined, lastEvent: { state: editingHaltedTape ? 'INPUT' : snapshot.state, message: editingHaltedTape ? `${pianoActionLabels[action]} Result Tape is editable.` : pianoActionLabels[action], action } }
   }
   if (action === 'play') {
     const result = resultFor(tapeText(snapshot.tape))

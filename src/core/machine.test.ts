@@ -33,6 +33,25 @@ describe('piano-first machine', () => {
     expect(machine.result).toEqual({ binary: '10', decimal: 2, octal: '2' })
   })
 
+  it('clears the finished result when reset starts a new run', () => {
+    let machine = applyPianoAction(enterOnePlusOne(), 'play')
+    while (!machine.halted) machine = runStep(machine)
+    machine = applyPianoAction(machine, 'reset')
+    expect(machine.tape).toEqual({})
+    expect(machine.state).toBe('INPUT')
+    expect(machine.halted).toBe(false)
+  })
+
+  it('can edit a finished result and use it as the next operand', () => {
+    let machine = applyPianoAction(enterOnePlusOne(), 'play')
+    while (!machine.halted) machine = runStep(machine)
+    for (const action of ['moveRight', 'writeSeparator', 'moveRight', 'write1'] as PianoAction[]) machine = applyPianoAction(machine, action)
+    expect(tapeText(machine.tape)).toBe('10#1')
+    machine = applyPianoAction(machine, 'play')
+    while (!machine.halted) machine = runStep(machine)
+    expect(machine.result?.binary).toBe('11')
+  })
+
   it('exposes the simple physical keyboard mapping', () => {
     expect(pianoActions.y).toBe('write1')
     expect(pianoActions.z).toBe('setState0')
