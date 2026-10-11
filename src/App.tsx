@@ -36,9 +36,9 @@ const stateRegister = (snapshot: MachineSnapshot): (typeof stateNames)[number] =
 const tapePositions = (head: number) => Array.from({ length: 19 }, (_, index) => head - 9 + index)
 
 const mechanicalStages: Array<{ id: MechanicalPhase; action: PianoAction; step: string; code: string; title: string; detail: string }> = [
-  { id: 'READ_A', action: 'setState1', step: '①', code: 'q1', title: '讀 A 推棘輪', detail: '探針讀 A → 推棘輪' },
-  { id: 'READ_B', action: 'setState2', step: '②', code: 'q2', title: '讀 B 推棘輪', detail: '探針讀 B → 鎖進位栓' },
-  { id: 'BELL_EQ', action: 'setState3', step: '③', code: 'q3', title: '🔔 當！印 =', detail: '讀完敲鈴 → 打孔印 =' },
+  { id: 'READ_A', action: 'setState1', step: '①', code: 'q1', title: '讀 A 推棘輪', detail: '推進爪推齒 → 止回爪鎖定' },
+  { id: 'READ_B', action: 'setState2', step: '②', code: 'q2', title: '讀 B 再累加', detail: '同爪再推齒 → 頂出進位栓' },
+  { id: 'BELL_EQ', action: 'setState3', step: '③', code: 'q3', title: '🔔 當！印 =', detail: '推進爪彈回 → 打孔印 =' },
   { id: 'STAMP_SUM', action: 'setState4', step: '④', code: 'q4', title: '凸輪印個位', detail: '移至個位 → 印奇偶位' },
   { id: 'STAMP_CARRY', action: 'setState5', step: '⑤', code: 'q5', title: '退格印進位', detail: '往左退格 → 釋放進位' },
 ]
@@ -161,11 +161,10 @@ function App() {
   const activePhaseIndex = activePhase ? mechanicalStages.findIndex((s) => s.id === activePhase) : -1
 
   // During INPUT, ratchet stays at 0 until ▶ / ⏭ starts decomposition
-  const aBit = activeGear ? activeGear.aBit : null
-  const bBit = activeGear && activePhase !== 'READ_A' ? activeGear.bBit : null
-  const carryIn = activeGear ? activeGear.carryIn : 0
+  const isProbing = activePhase === 'READ_A' || activePhase === 'READ_B'
+  const pawlStroke = isProbing ? (activeGear?.pawlStroke ?? 0) : 0
   const ratchetNotch = activeGear ? activeGear.ratchetTotal : 0
-  const sumBit = activeGear && activePhase !== 'READ_A' ? activeGear.sumBit : null
+  const sumBit = activeGear ? (ratchetNotch % 2 as 0 | 1) : null
   const carryLatched = activeGear ? activeGear.carryOut === 1 : false
   const bellRinging = Boolean(activeGear?.bellRung)
   const hammerPunching = Boolean(activeGear?.punching)
@@ -173,23 +172,14 @@ function App() {
   const currentSymbol = formatTapeSymbol(machine.tape[machine.head])
   const gearWorking = running || ['SCAN', 'ADD', 'CARRY', 'WRITE'].includes(machine.state)
   const gearPhaseLabel = activePhase ?? (machine.state === 'HALT' ? 'HALT' : 'READY (0格)')
-  const gearEquation = activeGear
-    ? activePhase === 'READ_A'
-      ? `① 讀 A(${activeGear.aBit}) → 棘輪推至第 ${ratchetNotch} 格`
-      : activePhase === 'READ_B'
-        ? `② 讀 B(${activeGear.bBit}) → ${activeGear.aBit} + ${activeGear.bBit} = 第 ${ratchetNotch} 格 (${ratchetNotch.toString(2).padStart(2, '0')}₂)`
-        : activePhase === 'BELL_EQ'
-          ? `③ 🔔 當——！讀完 A+B（第 ${ratchetNotch} 格），打孔印出「=」`
-          : activePhase === 'STAMP_SUM'
-            ? `④ 凸輪打孔：第 ${ratchetNotch} 格（${activeGear.sumBit === 1 ? '奇數凸齒' : '偶數凹槽'}）→ 個位格印 ${activeGear.sumBit}`
-            : `⑤ 進位栓釋放：往左退一格印出進位 1 → 棘輪歸零`
-    : '輸入 A#B 時棘輪保持歸零 (0 格)；按下 ▶ 開始五動分解運算'
+  const gearSummary = activeGear
+    ? `止回爪鎖定第 ${ratchetNotch} 格 (${ratchetNotch.toString(2).padStart(2, '0')}₂) · ${sumBit === 1 ? '奇數凸齒 (1)' : '偶數凹槽 (0)'} · 進位栓 ${carryLatched ? 'LOCK 1' : 'FREE 0'}`
+    : '棘輪歸零 (00₂)；輸入 A#B 後按 ▶ 啟動五動分解。'
 
   const currentStateSlot = stateRegister(machine)
   const stateIndex = Math.max(0, stateNames.indexOf(currentStateSlot))
   const stateStepDeg = 360 / stateNames.length
 
-  const isProbing = activePhase === 'READ_A' || activePhase === 'READ_B'
   const currentCellSymbol = machine.tape[machine.head]
   const probeDropThrough = isProbing && currentCellSymbol === '1'
   const probeBlocked = isProbing && currentCellSymbol === '0'
@@ -198,7 +188,7 @@ function App() {
   const probeStatusText = isEqualsCell
     ? '🔔 雙橫槽孔 (=) · 觸發銅鈴與結果打孔'
     : isSeparatorCell
-      ? '⊞ 分隔雙方孔 (#) · 切換 A → B 棘爪軌道'
+      ? '⊞ 分隔雙方孔 (#) · 區隔兩數'
       : hammerPunching
         ? `🔨 衝頭打孔 (${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head})`
         : probeDropThrough
@@ -355,14 +345,14 @@ function App() {
         <div className="module-heading"><span>ARITHMETIC RATCHET (斜齒棘輪)</span><span>{gearPhaseLabel}</span></div>
         <div className="ratchet-bench" aria-label="1900s 4-notch mechanical adder mechanism">
           <div className="pawl-stack">
-            <div className={`input-pawl ${activePhase === 'READ_A' ? 'pushing' : ''} ${aBit === 1 ? 'engaged' : ''}`} aria-label="A input pawl">
-              <span className="pawl-tag">① A 棘爪</span>
-              <strong>{aBit === null ? '待命' : aBit === 1 ? '+1 齒' : '+0'}</strong>
+            <div className={`input-pawl ${isProbing && pawlStroke === 1 ? 'pushing' : ''}`} aria-label="Driving pawl">
+              <span className="pawl-tag">①② 推進爪</span>
+              <strong>{isProbing ? (pawlStroke === 1 ? '+1 齒' : '+0 齒') : '待命'}</strong>
               <i className="pawl-claw" aria-hidden="true" />
             </div>
-            <div className={`input-pawl ${activePhase === 'READ_B' ? 'pushing' : ''} ${bBit === 1 ? 'engaged' : ''}`} aria-label="B input pawl">
-              <span className="pawl-tag">② B 棘爪</span>
-              <strong>{bBit === null ? '待命' : bBit === 1 ? '+1 齒' : '+0'}</strong>
+            <div className={`input-pawl ${activePhase === 'STAMP_SUM' ? 'pushing' : sumBit === 1 ? 'engaged' : ''}`} aria-label="Odd-even cam">
+              <span className="pawl-tag">④ 奇偶凸輪</span>
+              <strong>{sumBit === null ? '凹槽 0' : sumBit === 1 ? '凸齒 1' : '凹槽 0'}</strong>
               <i className="pawl-claw" aria-hidden="true" />
             </div>
           </div>
@@ -382,7 +372,7 @@ function App() {
               <span className="wheel-notch n1 odd-cam"><b>1</b><small>01₂</small></span>
               <span className="wheel-notch n2 carry-cam"><b>2</b><small>10₂</small></span>
               <span className="wheel-notch n3 odd-cam carry-cam"><b>3</b><small>11₂</small></span>
-              <div className="wheel-hub"><span>+{ratchetNotch}</span></div>
+              <div className="wheel-hub"><span>{ratchetNotch}格</span></div>
             </div>
           </div>
 
@@ -398,21 +388,7 @@ function App() {
             </div>
           </div>
         </div>
-
-        <div className="gear-equation">
-          <strong>{gearEquation}</strong>
-          <span>
-            {activeGear
-              ? `棘輪停在第 ${ratchetNotch} 格（奇偶凸輪 Sum=${activeGear.sumBit}；進位栓 Carry=${carryLatched ? 1 : 0}；打孔錘=${hammerPunching ? '🔨 壓印中' : '抬起'}）`
-              : `目前紙帶：${rawTape || '空白'}（彈完 1#1 後按 ▶ 或連按 ⏭ 觀察五動分解）`}
-          </span>
-        </div>
-        <div className="gear-explanation">
-          <div><span>①② A/B 推齒</span><b>{aBit ?? '—'} 齒 / {bBit ?? '—'} 齒</b></div>
-          <div><span>棘輪目前格位</span><b>第 {ratchetNotch} 格 ({ratchetNotch.toString(2).padStart(2, '0')}₂)</b></div>
-          <div><span>④ 奇偶凸輪</span><b>{sumBit === null ? '待命' : `個位印 ${sumBit}`}</b></div>
-          <div><span>⑤ 進位栓</span><b>{activePhase === 'STAMP_CARRY' ? '釋放印 1' : carryLatched ? 'LOCK 1' : `FREE ${carryIn}`}</b></div>
-        </div>
+        <p className="module-note">{gearSummary}</p>
       </section>
     </section>
 
@@ -421,7 +397,7 @@ function App() {
 
     <section className="run-module module"><div className="module-heading"><span>MECHANICAL READOUT</span><span>{machine.lastEvent?.message ?? '請用鋼琴輸入 1#1'}</span></div><div className="run-status"><strong>{machine.state}</strong><span>{machine.halted && machine.result ? `${rawTape} （${machine.result.binary}₂ = ${machine.result.decimal}₁₀ = ${machine.result.octal}₈）` : `Tape: ${rawTape || 'blank'}`}</span></div><label>速度 <b>{speed} steps / sec</b><input type="range" min="0.5" max="6" step="0.5" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} /></label></section>
 
-    <details className="advanced-module"><summary>ADVANCED：transition table / complete key map / mechanical details</summary><p>按下 ▶ 或 ⏭ 後依序執行：① 讀 A 推棘輪 → ② 讀 B 推棘輪並鎖進位栓 → ③ 敲響「當！」銅鈴並印 = → ④ 移至個位格印奇偶位 → ⑤ 往左退一格釋放進位栓印高位。</p></details>
+    <details className="advanced-module"><summary>ADVANCED：transition table / complete key map / mechanical details</summary><p>按下 ▶ 或 ⏭ 後依序執行：① 探針讀首數，推進棘爪推棘輪並由止回爪卡住 → ② 探針跨過 # 讀次數，同一推進棘爪再把棘輪往上推並頂出進位栓 → ③ 推進爪彈回待命、敲響「當！」銅鈴並印 = → ④ 移至個位格，照棘輪奇偶凸輪印個位 → ⑤ 往左退一格釋放進位栓印高位。</p></details>
     <footer><span>PIANO TURING MACHINE / 2026</span><span>STATE · TAPE · GEAR · SOUND</span><span>{machine.halted ? 'FINAL CHORD' : 'READY TO PLAY'}</span></footer>
   </main>
 }

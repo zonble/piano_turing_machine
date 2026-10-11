@@ -9,6 +9,8 @@ export type MechanicalPhase = 'READ_A' | 'READ_B' | 'BELL_EQ' | 'STAMP_SUM' | 'S
 export type GearState = {
   aBit: 0 | 1
   bBit: 0 | 1
+  pawlStroke: 0 | 1
+  prevNotch: 0 | 1 | 2 | 3
   carryIn: 0 | 1
   ratchetTotal: 0 | 1 | 2 | 3
   sumBit: 0 | 1
@@ -102,7 +104,7 @@ function computeGearForInput(input: string, carryIn: 0 | 1 = 0): GearState | und
   const ratchetTotal = (aBit + bBit + carryIn) as 0 | 1 | 2 | 3
   const sumBit = (ratchetTotal % 2) as 0 | 1
   const carryOut = (ratchetTotal >= 2 ? 1 : 0) as 0 | 1
-  return { aBit, bBit, carryIn, ratchetTotal, sumBit, carryOut }
+  return { aBit, bBit, pawlStroke: 0, prevNotch: aBit, carryIn, ratchetTotal, sumBit, carryOut }
 }
 
 function resultFor(input: string): MachineResult | undefined {
@@ -214,6 +216,8 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
     const scanAGear: GearState = {
       aBit: gear.aBit,
       bBit: 0,
+      pawlStroke: gear.aBit,
+      prevNotch: 0,
       carryIn: 0,
       ratchetTotal: gear.aBit,
       sumBit: gear.aBit,
@@ -234,7 +238,7 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
       program: { result: result.binary, writeIndex: result.binary.length - 1, eqPos, gear },
       lastEvent: {
         state: 'SCAN',
-        message: `① 讀取 A：讀寫頭移至 A(${gear.aBit})，A 棘爪將棘輪推至第 ${gear.aBit} 格。`,
+        message: `① 探針讀首數：推進棘爪推 +${gear.aBit} 齒，止回棘爪卡住第 ${gear.aBit} 格（靠棘輪角度記住首數）。`,
         action,
       },
     }
@@ -253,11 +257,11 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
       state: 'ADD',
       head: bounds.last,
       carry: gear.carryOut,
-      gear: { ...gear, phase: 'READ_B', bellRung: false, punching: false },
+      gear: { ...gear, pawlStroke: gear.bBit, prevNotch: gear.aBit, phase: 'READ_B', bellRung: false, punching: false },
       step: snapshot.step + 1,
       lastEvent: {
         state: 'ADD',
-        message: `② 讀取 B：讀寫頭移至 B(${gear.bBit})，B 棘爪將棘輪推至第 ${gear.ratchetTotal} 格${gear.carryOut ? '，頂出進位栓 LOCK 1' : ''}。`,
+        message: `② 探針跨過 # 讀次數：同一支推進棘爪再推 +${gear.bBit} 齒，棘輪從第 ${gear.aBit} 格推至第 ${gear.ratchetTotal} 格${gear.carryOut ? '，凸輪頂出進位栓 LOCK 1' : ''}。`,
       },
     }
   }
@@ -270,11 +274,11 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
       state: 'CARRY',
       head: eqPos,
       carry: gear.carryOut,
-      gear: { ...gear, phase: 'BELL_EQ', bellRung: true, punching: true },
+      gear: { ...gear, pawlStroke: 0, prevNotch: gear.ratchetTotal, phase: 'BELL_EQ', bellRung: true, punching: true },
       step: snapshot.step + 1,
       lastEvent: {
         state: 'CARRY',
-        message: `③ 當——！讀完 A 與 B 敲響銅鈴，在紙帶印下「=」（棘輪停在第 ${gear.ratchetTotal} 格）。`,
+        message: `③ 當——！推進棘爪彈回待命，止回棘爪鎖定第 ${gear.ratchetTotal} 格，在紙帶打孔印下「=」。`,
       },
     }
   }

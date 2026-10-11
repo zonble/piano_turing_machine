@@ -68,27 +68,33 @@ describe('piano-first machine', () => {
     // During INPUT, gear is not engaged yet
     expect(inputMachine.gear).toBeUndefined()
 
-    // Step 1 (play -> SCAN / READ_A): head at 0, ratchet advances to 1
+    // Step 1 (play -> SCAN / READ_A): head at 0, driving pawl strokes +1, ratchet advances 0 -> 1
     let m = applyPianoAction(inputMachine, 'play')
     expect(m.state).toBe('SCAN')
     expect(m.head).toBe(0)
+    expect(m.gear?.pawlStroke).toBe(1)
+    expect(m.gear?.prevNotch).toBe(0)
     expect(m.gear?.ratchetTotal).toBe(1)
     expect(m.gear?.phase).toBe('READ_A')
 
-    // Step 2 (SCAN -> ADD / READ_B): head at 2, ratchet advances to 2, carry latch locks 1
+    // Step 2 (SCAN -> ADD / READ_B): head at 2, same driving pawl strokes +1 again, ratchet advances 1 -> 2, carry latch locks 1
     m = runStep(m)
     expect(m.state).toBe('ADD')
     expect(m.head).toBe(2)
+    expect(m.gear?.pawlStroke).toBe(1)
+    expect(m.gear?.prevNotch).toBe(1)
     expect(m.gear?.ratchetTotal).toBe(2)
     expect(m.gear?.carryOut).toBe(1)
     expect(m.carry).toBe(1)
     expect(m.gear?.phase).toBe('READ_B')
 
-    // Step 3 (ADD -> CARRY / BELL_EQ): rings bell, head at 3, stamps '='
+    // Step 3 (ADD -> CARRY / BELL_EQ): driving pawl retracts (0), locking pawl holds notch 2, rings bell, head at 3, stamps '='
     m = runStep(m)
     expect(m.state).toBe('CARRY')
     expect(m.head).toBe(3)
     expect(m.tape[3]).toBe('equals')
+    expect(m.gear?.pawlStroke).toBe(0)
+    expect(m.gear?.ratchetTotal).toBe(2)
     expect(m.gear?.bellRung).toBe(true)
     expect(m.gear?.phase).toBe('BELL_EQ')
 
@@ -98,6 +104,7 @@ describe('piano-first machine', () => {
     expect(m.head).toBe(5)
     expect(m.tape[5]).toBe('0')
     expect(m.halted).toBe(false)
+    expect(m.gear?.pawlStroke).toBe(0)
     expect(m.gear?.phase).toBe('STAMP_SUM')
 
     // Step 5 (WRITE -> HALT / STAMP_CARRY): head steps left to twos place (4), releases carry latch, stamps '1'
@@ -107,6 +114,8 @@ describe('piano-first machine', () => {
     expect(m.head).toBe(4)
     expect(m.tape[4]).toBe('1')
     expect(m.carry).toBe(0)
+    expect(m.gear?.pawlStroke).toBe(0)
+    expect(m.gear?.ratchetTotal).toBe(0)
     expect(m.gear?.phase).toBe('STAMP_CARRY')
     expect(tapeText(m.tape)).toBe('1#1=10')
   })
