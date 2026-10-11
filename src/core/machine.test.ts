@@ -180,4 +180,52 @@ describe('piano-first machine', () => {
     expect(m.halted).toBe(true)
     expect(tapeText(m.tape)).toBe('1#1=10')
   })
+
+  it('steps through multi-bit addition (101101#11) bit-by-bit from right to left with detailed bit explanations', () => {
+    let m = createInitialMachine()
+    const raw = '101101#11'
+    for (let i = 0; i < raw.length; i += 1) {
+      const ch = raw[i]
+      m = applyPianoAction(m, ch === '1' ? 'write1' : ch === '0' ? 'write0' : 'writeSeparator')
+      if (i < raw.length - 1) m = applyPianoAction(m, 'moveRight')
+    }
+    expect(tapeText(m.tape)).toBe('101101#11')
+
+    // Bit 0 (個位 2⁰): reads A at pos 5 ('1'), then B at pos 8 ('1')
+    m = applyPianoAction(m, 'play')
+    expect(m.head).toBe(5)
+    expect(m.gear?.bitIndex).toBe(0)
+    expect(m.gear?.ratchetTotal).toBe(1)
+    expect(m.lastEvent?.message).toContain('讀取 A 的第 0 bit（個位 2⁰）')
+
+    m = runStep(m) // READ_B bit 0 at pos 8 ('1')
+    expect(m.head).toBe(8)
+    expect(m.gear?.bitIndex).toBe(0)
+    expect(m.gear?.ratchetTotal).toBe(2)
+    expect(m.gear?.carryOut).toBe(1)
+    expect(m.lastEvent?.message).toContain('讀取 B 的第 0 bit（個位 2⁰）')
+
+    m = runStep(m) // BELL_EQ at pos 9
+    expect(m.head).toBe(9)
+    expect(m.tape[9]).toBe('equals')
+
+    m = runStep(m) // STAMP_SUM bit 0 at pos 15 ('0')
+    expect(m.head).toBe(15)
+    expect(m.tape[15]).toBe('0')
+
+    // Bit 1 (2¹ 位): carries 1 in, reads A at pos 4 ('0') -> ratchet at 1
+    m = runStep(m)
+    expect(m.head).toBe(4)
+    expect(m.gear?.bitIndex).toBe(1)
+    expect(m.gear?.carryIn).toBe(1)
+    expect(m.gear?.ratchetTotal).toBe(1)
+    expect(m.lastEvent?.message).toContain('讀取 A 的第 1 bit（2¹ 位）')
+
+    // Finish remaining steps and verify every bit of 101101 + 11 = 110000 (45 + 3 = 48)
+    while (!m.halted) {
+      m = runStep(m)
+    }
+    expect(tapeText(m.tape)).toBe('101101#11=110000')
+    expect(m.result).toEqual({ binary: '110000', decimal: 48, octal: '60' })
+  })
 })

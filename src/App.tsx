@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { applyPianoAction, createInitialMachine, formatTapeSymbol, octalTapeText, pianoActions, runStep, tapeText, type MachineSnapshot, type MechanicalPhase, type PianoAction } from './core/machine'
+import { applyPianoAction, createInitialMachine, formatBitPosition, formatTapeSymbol, octalTapeText, pianoActions, runStep, tapeText, type MachineSnapshot, type MechanicalPhase, type PianoAction } from './core/machine'
 import { pianoFrequency, playBellChime, playFinalChord, playPunchStamp, playRatchetClick, playTone } from './core/audio'
 import './App.css'
 
@@ -39,7 +39,7 @@ const mechanicalStages: Array<{ id: MechanicalPhase; action: PianoAction; step: 
   { id: 'READ_A', action: 'setState1', step: '①', code: 'q1', title: '讀 A 推棘輪', detail: '推進爪推齒 → 止回爪鎖定' },
   { id: 'READ_B', action: 'setState2', step: '②', code: 'q2', title: '讀 B 再累加', detail: '同爪再推齒 → 頂出進位栓' },
   { id: 'BELL_EQ', action: 'setState3', step: '③', code: 'q3', title: '🔔 當！印 =', detail: '推進爪彈回 → 打孔印 =' },
-  { id: 'STAMP_SUM', action: 'setState4', step: '④', code: 'q4', title: '凸輪印個位', detail: '移至個位 → 印奇偶位' },
+  { id: 'STAMP_SUM', action: 'setState4', step: '④', code: 'q4', title: '凸輪印該位', detail: '奇偶凸輪 → 印當前 bit' },
   { id: 'STAMP_CARRY', action: 'setState5', step: '⑤', code: 'q5', title: '退格印進位', detail: '往左退格 → 釋放進位' },
 ]
 
@@ -188,12 +188,15 @@ function App() {
   const bellRinging = Boolean(activeGear?.bellRung)
   const hammerPunching = Boolean(activeGear?.punching)
 
+  const currentBitLabel = activeGear?.bitIndex !== undefined ? formatBitPosition(activeGear.bitIndex) : null
   const currentSymbol = formatTapeSymbol(machine.tape[machine.head])
   const gearWorking = running || ['SCAN', 'ADD', 'CARRY', 'WRITE'].includes(machine.state)
-  const gearPhaseLabel = activePhase ?? (machine.state === 'HALT' ? 'HALT' : 'READY (0格)')
-  const gearSummary = activeGear
-    ? `止回爪鎖定第 ${ratchetNotch} 格 (${ratchetNotch.toString(2).padStart(2, '0')}₂) · ${sumBit === 1 ? '奇數凸齒 (1)' : '偶數凹槽 (0)'} · 進位栓 ${carryLatched ? 'LOCK 1' : 'FREE 0'}`
-    : '棘輪歸零 (00₂)；輸入 A#B 後按 ▶ 啟動五動分解。'
+  const gearPhaseLabel = currentBitLabel && activePhase
+    ? `${currentBitLabel} · ${activePhase}`
+    : activePhase ?? (machine.state === 'HALT' ? 'HALT' : 'READY (0格)')
+  const gearSummary = activeGear && machine.lastEvent?.message
+    ? machine.lastEvent.message
+    : '棘輪歸零 (00₂)；輸入 A#B 後按 ▶ 啟動逐位元分解。'
 
   const currentStateSlot = stateRegister(machine)
   const stateIndex = Math.max(0, stateNames.indexOf(currentStateSlot))
@@ -204,17 +207,23 @@ function App() {
   const probeBlocked = isProbing && currentCellSymbol === '0'
   const isSeparatorCell = currentCellSymbol === 'separator'
   const isEqualsCell = currentCellSymbol === 'equals'
-  const probeStatusText = isEqualsCell
-    ? '🔔 雙橫槽孔 (=) · 觸發銅鈴與結果打孔'
-    : isSeparatorCell
-      ? '⊞ 分隔雙方孔 (#) · 區隔兩數'
-      : hammerPunching
-        ? `🔨 衝頭打孔 (${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head})`
-        : probeDropThrough
-          ? '● 單圓孔穿通 (1) · 氣閥進氣 (+1齒)'
-          : probeBlocked || currentCellSymbol === '0'
-            ? '○ 無孔紙面 (0) · 擋住探針 (+0)'
-            : `${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head} · TRACKER BAR`
+  const probeStatusText = activePhase === 'READ_A' && currentBitLabel
+    ? `讀取 A 的${currentBitLabel} · ${probeDropThrough ? '● 穿孔 (1) → 推 +1 齒' : '○ 無孔 (0) → 推 +0 齒'}`
+    : activePhase === 'READ_B' && currentBitLabel
+      ? `讀取 B 的${currentBitLabel} · ${isSeparatorCell ? '無此高位 → +0 齒' : probeDropThrough ? '● 穿孔 (1) → 推 +1 齒' : '○ 無孔 (0) → 推 +0 齒'}`
+      : isEqualsCell
+        ? '🔔 雙橫槽孔 (=) · 觸發銅鈴與結果打孔'
+        : isSeparatorCell
+          ? '⊞ 分隔雙方孔 (#) · 區隔兩數'
+          : hammerPunching && currentBitLabel
+            ? `🔨 打孔印結果的${currentBitLabel} (${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head})`
+            : hammerPunching
+              ? `🔨 衝頭打孔 (${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head})`
+              : probeDropThrough
+                ? '● 單圓孔穿通 (1) · 氣閥進氣 (+1齒)'
+                : probeBlocked || currentCellSymbol === '0'
+                  ? '○ 無孔紙面 (0) · 擋住探針 (+0)'
+                  : `${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head} · TRACKER BAR`
 
   return <main className="app-shell">
     <header className="masthead"><div className="brand-mark">PTM<i /></div><div><p className="eyebrow">A MECHANICAL COMPUTING INSTRUMENT</p><h1>Piano <em>Turing</em> Machine</h1></div><div className={`machine-status ${running ? 'live' : ''}`}><span />{running ? 'PLAYING' : machine.halted ? 'HALT' : 'READY'}</div></header>
