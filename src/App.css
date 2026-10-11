@@ -30,7 +30,7 @@ button { cursor: pointer; }
 .state-gear-bench .state-wheel { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 10px; padding: 10px 6px 4px; }
 
 .stage-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
-.stage-pill { padding: 8px 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, .2); color: var(--muted); transition: border-color .35s ease, background .35s ease, transform .35s ease, box-shadow .35s ease; }
+.stage-pill { padding: 8px 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, .2); color: var(--muted); text-align: left; font: inherit; transition: border-color .35s ease, background .35s ease, transform .35s ease, box-shadow .35s ease; }
 .stage-header { display: flex; align-items: center; gap: 6px; }
 .stage-num { font-size: 13px; color: var(--brass); }
 .stage-pill strong { font-size: 11px; color: var(--cream); letter-spacing: .03em; }

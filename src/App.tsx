@@ -7,17 +7,40 @@ const keyNames = ['F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B', 'C', 'C♯', 'D', 
 const blackKeys = new Set(['F♯', 'G♯', 'A♯', 'C♯', 'D♯'])
 const whiteKeyIndices = keyNames.map((name, index) => blackKeys.has(name) ? -1 : index).filter((index) => index >= 0)
 const whiteKeyboardMap = ['z', 'x', 'c', 'v', 'b', 'n', 'm', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 'a', 's', 'd', 'f', 'g']
-const whiteLabels = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'HALT', '·', '·', '←', '→', '0', '1', '□', '#', '⏭', '▶', '⏹', '↺', '', '', '']
+const whiteLabels = ['q0待命', 'q1讀A', 'q2讀B', 'q3敲鈴', 'q4個位', 'q5進位', 'HALT', '·', '·', '←', '→', '0', '1', '□', '#', '⏭', '▶', '⏹', '↺', '', '', '']
 const stateNames = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'HALT'] as const
-const stateRegister = (state: MachineSnapshot['state']) => state === 'HALT' ? 'HALT' : state === 'INPUT' ? 'q0' : state === 'SCAN' ? 'q1' : state === 'ADD' ? 'q2' : state === 'CARRY' ? 'q3' : state === 'WRITE' ? 'q4' : state
+const stateSlotTitles: Record<(typeof stateNames)[number], string> = {
+  q0: 'q0 待命',
+  q1: 'q1 讀A',
+  q2: 'q2 讀B',
+  q3: 'q3 敲鈴',
+  q4: 'q4 個位',
+  q5: 'q5 進位',
+  HALT: 'HLT 完成',
+}
+const stateRegister = (snapshot: MachineSnapshot): (typeof stateNames)[number] => {
+  const phase = snapshot.gear?.phase
+  if (phase === 'READ_A') return 'q1'
+  if (phase === 'READ_B') return 'q2'
+  if (phase === 'BELL_EQ') return 'q3'
+  if (phase === 'STAMP_SUM') return snapshot.halted ? 'HALT' : 'q4'
+  if (phase === 'STAMP_CARRY') return 'q5'
+  if (snapshot.state === 'HALT') return 'HALT'
+  if (snapshot.state === 'INPUT') return 'q0'
+  if (snapshot.state === 'SCAN') return 'q1'
+  if (snapshot.state === 'ADD') return 'q2'
+  if (snapshot.state === 'CARRY') return 'q3'
+  if (snapshot.state === 'WRITE') return 'q4'
+  return snapshot.state
+}
 const tapePositions = (head: number) => Array.from({ length: 19 }, (_, index) => head - 9 + index)
 
-const mechanicalStages: Array<{ id: MechanicalPhase; step: string; title: string; detail: string }> = [
-  { id: 'READ_A', step: '①', title: '讀 A 推棘輪', detail: '探針讀 A → 推棘輪' },
-  { id: 'READ_B', step: '②', title: '讀 B 推棘輪', detail: '探針讀 B → 鎖進位栓' },
-  { id: 'BELL_EQ', step: '③', title: '🔔 當！印 =', detail: '讀完敲鈴 → 打孔印 =' },
-  { id: 'STAMP_SUM', step: '④', title: '凸輪印個位', detail: '移至個位 → 印奇偶位' },
-  { id: 'STAMP_CARRY', step: '⑤', title: '退格印進位', detail: '往左退格 → 釋放進位' },
+const mechanicalStages: Array<{ id: MechanicalPhase; action: PianoAction; step: string; code: string; title: string; detail: string }> = [
+  { id: 'READ_A', action: 'setState1', step: '①', code: 'q1', title: '讀 A 推棘輪', detail: '探針讀 A → 推棘輪' },
+  { id: 'READ_B', action: 'setState2', step: '②', code: 'q2', title: '讀 B 推棘輪', detail: '探針讀 B → 鎖進位栓' },
+  { id: 'BELL_EQ', action: 'setState3', step: '③', code: 'q3', title: '🔔 當！印 =', detail: '讀完敲鈴 → 打孔印 =' },
+  { id: 'STAMP_SUM', action: 'setState4', step: '④', code: 'q4', title: '凸輪印個位', detail: '移至個位 → 印奇偶位' },
+  { id: 'STAMP_CARRY', action: 'setState5', step: '⑤', code: 'q5', title: '退格印進位', detail: '往左退格 → 釋放進位' },
 ]
 
 function playPhaseSound(snapshot: MachineSnapshot) {
@@ -52,7 +75,7 @@ function App() {
   const dispatch = (action: PianoAction, keyIndex?: number) => {
     const next = applyPianoAction(machine, action)
     setMachine(next)
-    if ((action === 'play' || action === 'step') && next.gear?.phase) {
+    if ((action === 'play' || action === 'step' || action.startsWith('setState')) && next.gear?.phase) {
       playPhaseSound(next)
     } else if (keyIndex === undefined) {
       soundForAction(action)
@@ -60,7 +83,7 @@ function App() {
       playTone(pianoFrequency(41 + keyIndex), .18, 'triangle')
     }
     if (action === 'play' && !next.halted && next.program) setRunning(true)
-    if (action === 'step' || action === 'stop' || action === 'reset' || next.halted) setRunning(false)
+    if (action === 'step' || action.startsWith('setState') || action === 'stop' || action === 'reset' || next.halted) setRunning(false)
   }
 
   useEffect(() => {
@@ -124,7 +147,7 @@ function App() {
             : `⑤ 進位栓釋放：往左退一格印出進位 1 → 棘輪歸零`
     : '輸入 A#B 時棘輪保持歸零 (0 格)；按下 ▶ 開始五動分解運算'
 
-  const currentStateSlot = stateRegister(machine.state)
+  const currentStateSlot = stateRegister(machine)
   const stateIndex = Math.max(0, stateNames.indexOf(currentStateSlot))
   const stateStepDeg = 360 / stateNames.length
 
@@ -136,16 +159,19 @@ function App() {
         const isCurrent = activePhase === stage.id
         const isDone = activePhaseIndex > index || (machine.halted && index <= activePhaseIndex)
         return (
-          <div
+          <button
+            type="button"
             key={stage.id}
             className={`stage-pill ${isCurrent ? 'current' : ''} ${isDone ? 'done' : ''}`}
+            onClick={() => dispatch(stage.action)}
+            title={`點擊或按鋼琴 ${stage.code} 鍵直接切換至此分解步驟`}
           >
             <div className="stage-header">
-              <span className="stage-num">{stage.step}</span>
+              <span className="stage-num">{stage.step} {stage.code}</span>
               <strong>{stage.title}</strong>
             </div>
             <small>{stage.detail}</small>
-          </div>
+          </button>
         )
       })}
     </section>
@@ -189,7 +215,7 @@ function App() {
       </section>
 
       <section className={`state-module module ${gearWorking ? 'working' : ''}`}>
-        <div className="module-heading"><span>STATE GEAR</span><span>{currentStateSlot} · {machine.state}</span></div>
+        <div className="module-heading"><span>STATE GEAR (主凸輪軸)</span><span>{stateSlotTitles[currentStateSlot]}</span></div>
         <div className="state-gear-bench">
           <div className="state-gear-housing">
             <div className="index-pawl" title="狀態輪定位棘爪">▼</div>
@@ -220,12 +246,12 @@ function App() {
           <div className="state-wheel">
             {stateNames.map((state) => (
               <div className={`state-slot ${currentStateSlot === state ? 'current' : ''}`} key={state}>
-                <i />{state}
+                <i />{stateSlotTitles[state]}
               </div>
             ))}
           </div>
         </div>
-        <p className="module-note">狀態輪隨每步推進旋轉，與右側加法棘輪連動。</p>
+        <p className="module-note">主凸輪軸隨每動旋轉，也可按鋼琴左鍵 q0～q5 直接切換。</p>
       </section>
 
       <section className={`operation-module module ${gearWorking ? 'working' : ''}`}>

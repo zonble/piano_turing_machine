@@ -130,13 +130,56 @@ function tapeBounds(tape: Record<number, TapeSymbol>): { first: number; separato
   return { first, separator, last }
 }
 
+function inputOnlyTape(tape: Record<number, TapeSymbol>): Record<number, TapeSymbol> {
+  const cleaned: Record<number, TapeSymbol> = {}
+  const positions = Object.keys(tape).map(Number).sort((a, b) => a - b)
+  for (const pos of positions) {
+    if (tape[pos] === 'equals') break
+    cleaned[pos] = tape[pos]
+  }
+  return cleaned
+}
+
 export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction): MachineSnapshot {
   if (action === 'reset') {
     const restartingAfterHalt = snapshot.halted
     return { ...snapshot, tape: restartingAfterHalt ? {} : snapshot.tape, state: 'INPUT', head: 0, step: 0, carry: 0, halted: false, gear: undefined, result: undefined, error: undefined, program: undefined, lastEvent: { state: 'INPUT', message: restartingAfterHalt ? 'Result cleared; enter a new Tape input.' : 'Machine reset; Tape preserved.', action } }
   }
   if (action === 'stop') return { ...snapshot, halted: true, state: 'HALT', lastEvent: { state: 'HALT', message: 'Stopped by operator.', action } }
-  if (action.startsWith('setState')) { const state = `q${action.slice(-1)}` as StateId; return { ...snapshot, state, error: undefined, lastEvent: { state, message: `State register set to ${state}.`, action } } }
+  if (action.startsWith('setState')) {
+    const stageNum = Number(action.slice(-1))
+    const baseTape = inputOnlyTape(snapshot.tape)
+    const text = tapeText(baseTape)
+    const parsed = parseOperationInput('add', text)
+    if (parsed.ok) {
+      const bounds = tapeBounds(baseTape)
+      const cleanInput: MachineSnapshot = {
+        ...snapshot,
+        tape: baseTape,
+        head: bounds.last,
+        state: 'INPUT',
+        carry: 0,
+        halted: false,
+        gear: undefined,
+        result: undefined,
+        error: undefined,
+        program: undefined,
+      }
+      if (stageNum === 0) {
+        return {
+          ...cleanInput,
+          lastEvent: { state: 'INPUT', message: 'q0 待命：棘輪歸零，保留紙帶題目。', action },
+        }
+      }
+      let current = applyPianoAction(cleanInput, 'play')
+      for (let i = 1; i < stageNum && !current.halted; i += 1) {
+        current = runStep(current)
+      }
+      return current
+    }
+    const state = `q${stageNum}` as StateId
+    return { ...snapshot, state, error: undefined, lastEvent: { state, message: `State register set to ${state}.`, action } }
+  }
 
   let tape = { ...snapshot.tape }
   let baseHead = snapshot.head

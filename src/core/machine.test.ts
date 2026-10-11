@@ -142,4 +142,33 @@ describe('piano-first machine', () => {
     expect(m.halted).toBe(true)
     expect(tapeText(m.tape)).toBe('1#1=10')
   })
+
+  it('allows playing the 5 mechanical stages directly via the q1..q5 (setState1..setState5) piano keys', () => {
+    let m = enterOnePlusOne()
+
+    m = applyPianoAction(m, 'setState1') // q1: READ_A
+    expect(m.state).toBe('SCAN')
+    expect(m.gear?.phase).toBe('READ_A')
+    expect(m.gear?.ratchetTotal).toBe(1)
+
+    m = applyPianoAction(m, 'setState2') // q2: READ_B
+    expect(m.state).toBe('ADD')
+    expect(m.gear?.phase).toBe('READ_B')
+    expect(m.gear?.ratchetTotal).toBe(2)
+
+    m = applyPianoAction(m, 'setState3') // q3: BELL_EQ
+    expect(m.state).toBe('CARRY')
+    expect(m.gear?.phase).toBe('BELL_EQ')
+    expect(m.tape[3]).toBe('equals')
+
+    m = applyPianoAction(m, 'setState4') // q4: STAMP_SUM
+    expect(m.state).toBe('WRITE')
+    expect(m.gear?.phase).toBe('STAMP_SUM')
+    expect(m.tape[5]).toBe('0')
+
+    m = applyPianoAction(m, 'setState5') // q5: STAMP_CARRY -> HALT
+    expect(m.state).toBe('HALT')
+    expect(m.halted).toBe(true)
+    expect(tapeText(m.tape)).toBe('1#1=10')
+  })
 })
