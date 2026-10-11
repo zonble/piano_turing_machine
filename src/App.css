@@ -49,8 +49,18 @@ button { cursor: pointer; }
 .gear-equation { margin: 0 14px 10px; padding: 8px 10px; border-left: 2px solid var(--orange); background: rgba(224, 119, 62, .08); }
 .gear-equation strong { display: block; color: var(--cream); font: 15px 'IBM Plex Mono', monospace; letter-spacing: .02em; }
 .gear-equation span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
-.tape-window { position: relative; }
-.tape-module.scanning .tape-window::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--orange); box-shadow: 0 0 14px var(--orange); animation: scan-sweep 2.4s ease-in-out infinite alternate; }
+.tape-window { --cell-width: clamp(58px, 6.2vw, 76px); position: relative; box-shadow: inset 20px 0 22px -12px rgba(35, 22, 10, .55), inset -20px 0 22px -12px rgba(35, 22, 10, .55), 0 5px 18px rgba(0,0,0,.25); }
+.playhead-frame { position: absolute; top: 0; bottom: 0; left: calc(50% - (var(--cell-width) / 2)); width: var(--cell-width); border-left: 2px solid rgba(228, 119, 69, .75); border-right: 2px solid rgba(228, 119, 69, .75); box-shadow: inset 0 -5px var(--orange), inset 0 3px rgba(228, 119, 69, .6); pointer-events: none; z-index: 3; }
+.tape-window .tape-cells { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; height: 100%; display: block; transform: translateX(calc(var(--head, 0) * -1 * var(--cell-width))); transition: transform .36s cubic-bezier(.22, 1, .36, 1); will-change: transform; }
+.tape-window .tape-cell { position: absolute; top: 0; bottom: 0; width: var(--cell-width); left: calc(var(--cell-pos, 0) * var(--cell-width) - (var(--cell-width) / 2)); display: flex; align-items: center; justify-content: center; border-right: 1px solid rgba(77,50,24,.3); border-left: 1px solid rgba(77,50,24,.12); background: rgba(255, 240, 199, .13); color: var(--paper-ink); transition: background .24s ease; }
+.tape-window .tape-cell.selected { background: rgba(244, 218, 165, .68); box-shadow: none; }
+.tape-window .tape-cell .position { top: 18px; left: 7px; font-size: 10px; }
+.tape-window .tape-cell .sprocket { position: absolute; left: calc(50% - 4px); width: 8px; height: 8px; border-radius: 50%; background: rgba(45, 31, 16, .35); box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
+.tape-window .tape-cell .sprocket.top { top: 6px; }
+.tape-window .tape-cell .sprocket.bottom { bottom: 8px; }
+.tape-window .tape-cell.punched strong { animation: cell-punch .26s cubic-bezier(.22, 1.4, .36, 1); }
+@keyframes cell-punch { from { transform: scale(1.38) translateY(-4px); color: var(--orange); } to { transform: scale(1) translateY(0); } }
+.tape-module.scanning .tape-window::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--orange); box-shadow: 0 0 14px var(--orange); animation: scan-sweep 2.4s ease-in-out infinite alternate; z-index: 4; }
 .tape-module.scanning .tape-cell.selected { animation: scan-cell 1.2s ease-in-out infinite alternate; }
 .tape-module.scanning .needle { animation: scan-needle .8s ease-in-out infinite alternate; }
 @keyframes scan-sweep { from { left: 0; } to { left: calc(100% - 3px); } }

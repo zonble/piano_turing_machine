@@ -10,7 +10,7 @@ const whiteKeyboardMap = ['z', 'x', 'c', 'v', 'b', 'n', 'm', 'q', 'w', 'e', 'r',
 const whiteLabels = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'HALT', '·', '·', '←', '→', '0', '1', '□', '#', '⏭', '▶', '⏹', '↺', '', '', '']
 const stateNames = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'HALT'] as const
 const stateRegister = (state: MachineSnapshot['state']) => state === 'HALT' ? 'HALT' : state === 'INPUT' ? 'q0' : state === 'SCAN' ? 'q1' : state === 'ADD' ? 'q2' : state === 'CARRY' ? 'q3' : state === 'WRITE' ? 'q4' : state
-const tapePositions = (head: number) => Array.from({ length: 13 }, (_, index) => head - 6 + index)
+const tapePositions = (head: number) => Array.from({ length: 19 }, (_, index) => head - 9 + index)
 
 function App() {
   const [machine, setMachine] = useState<MachineSnapshot>(() => createInitialMachine())
@@ -69,26 +69,59 @@ function App() {
   const previewB = rawTape.includes('#') ? (rawRight.endsWith('1') ? 1 : rawRight.endsWith('0') ? 0 : null) : null
 
   const activeGear = machine.gear
-  const aBit = activeGear ? activeGear.aBit : previewA
-  const bBit = activeGear ? activeGear.bBit : previewB
+  const aBit = activeGear ? activeGear.aBit : machine.state === 'SCAN' && machine.program ? machine.program.gear.aBit : previewA
+  const bBit = activeGear ? activeGear.bBit : machine.state === 'SCAN' ? null : previewB
   const carryIn = activeGear ? activeGear.carryIn : machine.carry
-  const ratchetNotch = activeGear ? activeGear.ratchetTotal : 0
-  const sumBit = activeGear ? activeGear.sumBit : null
-  const carryLatched = activeGear ? activeGear.carryOut === 1 : machine.carry === 1
+  const previewNotch = ((previewA ?? 0) + (previewB ?? 0) + carryIn) as 0 | 1 | 2 | 3
+  const ratchetNotch = activeGear
+    ? activeGear.ratchetTotal
+    : machine.state === 'SCAN' && machine.program
+      ? machine.program.gear.aBit
+      : previewNotch
+  const sumBit = activeGear ? activeGear.sumBit : (previewA !== null && previewB !== null ? (previewNotch % 2) as 0 | 1 : null)
+  const carryLatched = activeGear ? activeGear.carryOut === 1 : machine.carry === 1 || previewNotch >= 2
 
   const currentSymbol = machine.tape[machine.head] === 'separator' ? '#' : machine.tape[machine.head] ?? '□'
   const gearWorking = running || ['SCAN', 'ADD', 'CARRY', 'WRITE'].includes(machine.state)
   const gearPhase = machine.state === 'SCAN' ? 'SCAN' : machine.state === 'ADD' ? 'RATCHET' : machine.state === 'CARRY' ? 'LATCH' : machine.state === 'WRITE' ? 'STAMP' : machine.state === 'HALT' ? 'HALT' : 'READY'
   const gearEquation = activeGear
     ? `${activeGear.aBit} + ${activeGear.bBit} + ${activeGear.carryIn} → 第 ${activeGear.ratchetTotal} 格 (${activeGear.ratchetTotal.toString(2).padStart(2, '0')}₂)`
-    : `${aBit ?? '—'} + ${bBit ?? '—'} + ${carryIn} → 第 0 格 (00₂)`
+    : `${aBit ?? '—'} + ${bBit ?? '—'} + ${carryIn} → 第 ${ratchetNotch} 格 (${ratchetNotch.toString(2).padStart(2, '0')}₂)`
 
   return <main className="app-shell">
     <header className="masthead"><div className="brand-mark">PTM<i /></div><div><p className="eyebrow">A MECHANICAL COMPUTING INSTRUMENT</p><h1>Piano <em>Turing</em> Machine</h1></div><div className={`machine-status ${running ? 'live' : ''}`}><span />{running ? 'PLAYING' : machine.halted ? 'HALT' : 'READY'}</div></header>
 
     <section className="machine-board">
       <section className="state-module module"><div className="module-heading"><span>STATE GEAR</span><span>CONTROL MEMORY</span></div><div className="state-wheel">{stateNames.map((state) => <div className={`state-slot ${stateRegister(machine.state) === state ? 'current' : ''}`} key={state}><i />{state}</div>)}</div><p className="module-note">目前狀態由狀態輪保存，不寫入 Tape。</p></section>
-      <section className={`tape-module module ${machine.state === 'SCAN' ? 'scanning' : ''}`}><div className="module-heading"><span>TAPE + HEAD</span><span>{currentSymbol} AT {machine.head >= 0 ? '+' : ''}{machine.head}</span></div><div className="tape-window"><div className="tape-cells">{cells.map((position) => <div className={`tape-cell ${position === machine.head ? 'selected' : ''}`} key={position}><span className="position">{position}</span><strong>{machine.tape[position] === 'separator' ? '#' : machine.tape[position] ?? '□'}</strong>{position === machine.head && <span className="needle">⌄</span>}</div>)}</div></div><div className="tape-readout"><span>RAW <b>{rawTape || 'blank'}</b></span><span>HEAD <b>{machine.head}</b></span><span>STEP <b>{String(machine.step).padStart(3, '0')}</b></span></div></section>
+      <section className={`tape-module module ${machine.state === 'SCAN' ? 'scanning' : ''}`}>
+        <div className="module-heading"><span>TAPE + HEAD</span><span>{currentSymbol} AT {machine.head >= 0 ? '+' : ''}{machine.head}</span></div>
+        <div className="tape-window">
+          <div className="playhead-frame" aria-hidden="true" />
+          <div
+            className="tape-cells"
+            style={{ '--head': machine.head } as React.CSSProperties}
+          >
+            {cells.map((position) => {
+              const symbol = machine.tape[position] === 'separator' ? '#' : machine.tape[position] ?? '□'
+              const isSelected = position === machine.head
+              return (
+                <div
+                  className={`tape-cell ${isSelected ? 'selected' : ''} ${machine.tape[position] ? 'punched' : ''}`}
+                  key={position}
+                  style={{ '--cell-pos': position } as React.CSSProperties}
+                >
+                  <span className="sprocket top" aria-hidden="true" />
+                  <span className="position">{position}</span>
+                  <strong key={`${position}-${symbol}`}>{symbol}</strong>
+                  {isSelected && <span className="needle">⌄</span>}
+                  <span className="sprocket bottom" aria-hidden="true" />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        <div className="tape-readout"><span>RAW <b>{rawTape || 'blank'}</b></span><span>HEAD <b>{machine.head}</b></span><span>STEP <b>{String(machine.step).padStart(3, '0')}</b></span></div>
+      </section>
       <section className={`operation-module module ${gearWorking ? 'working' : ''} phase-${gearPhase.toLowerCase()}`}>
         <div className="module-heading"><span>ARITHMETIC GEAR (4-NOTCH RATCHET)</span><span>{gearPhase}</span></div>
         <div className="ratchet-bench" aria-label="1900s 4-notch mechanical adder mechanism">

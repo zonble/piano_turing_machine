@@ -100,6 +100,14 @@ function invalidInput(snapshot: MachineSnapshot): MachineSnapshot {
   return { ...snapshot, error: parsed.error.message, lastEvent: { state: snapshot.state, message: parsed.error.message } }
 }
 
+function tapeBounds(tape: Record<number, TapeSymbol>): { first: number; separator: number; last: number } {
+  const positions = Object.keys(tape).map(Number).sort((a, b) => a - b)
+  const first = positions[0] ?? 0
+  const last = positions[positions.length - 1] ?? 2
+  const separator = positions.find((pos) => tape[pos] === 'separator') ?? Math.floor((first + last) / 2)
+  return { first, separator, last }
+}
+
 export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction): MachineSnapshot {
   if (action === 'reset') {
     const restartingAfterHalt = snapshot.halted
@@ -123,7 +131,8 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
     const result = resultFor(text)
     const gear = computeGearForInput(text, 0)
     if (!result || !gear) return invalidInput(snapshot)
-    return { ...snapshot, state: 'SCAN', step: snapshot.step + 1, carry: 0, gear: undefined, error: undefined, result: undefined, program: { result: result.binary, writeIndex: 0, gear }, lastEvent: { state: 'SCAN', message: 'Scan the two operands from the Tape.', action } }
+    const bounds = tapeBounds(snapshot.tape)
+    return { ...snapshot, state: 'SCAN', head: bounds.first, step: snapshot.step + 1, carry: 0, gear: undefined, error: undefined, result: undefined, program: { result: result.binary, writeIndex: 0, gear }, lastEvent: { state: 'SCAN', message: 'Scan the two operands from the Tape.', action } }
   }
   if (action === 'step') return runStep(snapshot)
   return snapshot
@@ -132,10 +141,12 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
 export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
   if (snapshot.halted || !snapshot.program) return snapshot
   const { gear } = snapshot.program
+  const bounds = tapeBounds(snapshot.tape)
   if (snapshot.state === 'SCAN') {
     return {
       ...snapshot,
       state: 'ADD',
+      head: bounds.last,
       gear,
       step: snapshot.step + 1,
       lastEvent: {
@@ -149,6 +160,7 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
     return {
       ...snapshot,
       state: 'CARRY',
+      head: bounds.separator,
       carry: gear.carryOut,
       gear,
       step: snapshot.step + 1,

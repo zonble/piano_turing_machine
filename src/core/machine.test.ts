@@ -64,8 +64,11 @@ describe('piano-first machine', () => {
 
   it('steps the 4-notch mechanical adder gear accurately for 1#1 and 1#0', () => {
     let onePlusOne = applyPianoAction(enterOnePlusOne(), 'play')
+    expect(onePlusOne.state).toBe('SCAN')
+    expect(onePlusOne.head).toBe(0)
     onePlusOne = runStep(onePlusOne) // SCAN -> ADD
     expect(onePlusOne.state).toBe('ADD')
+    expect(onePlusOne.head).toBe(2)
     expect(onePlusOne.gear).toEqual({
       aBit: 1,
       bBit: 1,
@@ -76,15 +79,21 @@ describe('piano-first machine', () => {
     })
     onePlusOne = runStep(onePlusOne) // ADD -> CARRY
     expect(onePlusOne.state).toBe('CARRY')
+    expect(onePlusOne.head).toBe(1)
     expect(onePlusOne.carry).toBe(1)
     expect(onePlusOne.gear?.ratchetTotal).toBe(2)
+    onePlusOne = runStep(onePlusOne) // CARRY -> WRITE
+    expect(onePlusOne.state).toBe('WRITE')
+    expect(onePlusOne.head).toBe(0)
 
     let onePlusZero = createInitialMachine()
     for (const action of ['write1', 'moveRight', 'writeSeparator', 'moveRight', 'write0'] as PianoAction[]) {
       onePlusZero = applyPianoAction(onePlusZero, action)
     }
     onePlusZero = applyPianoAction(onePlusZero, 'play')
+    expect(onePlusZero.head).toBe(0)
     onePlusZero = runStep(onePlusZero) // SCAN -> ADD
+    expect(onePlusZero.head).toBe(2)
     expect(onePlusZero.gear).toEqual({
       aBit: 1,
       bBit: 0,
@@ -94,6 +103,7 @@ describe('piano-first machine', () => {
       carryOut: 0,
     })
     onePlusZero = runStep(onePlusZero) // ADD -> CARRY
+    expect(onePlusZero.head).toBe(1)
     expect(onePlusZero.carry).toBe(0)
   })
 })
