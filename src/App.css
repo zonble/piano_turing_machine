@@ -20,13 +20,18 @@ button { cursor: pointer; }
 
 .machine-board { display: grid; grid-template-columns: minmax(0, 1fr) 218px 292px; gap: 16px; margin-top: 24px; align-items: stretch; }
 .state-gear-bench { display: flex; flex-direction: column; align-items: center; padding: 12px 10px 4px; }
-.state-gear-housing { position: relative; display: grid; place-items: center; width: 108px; height: 108px; margin: 0 auto; }
-.state-gear-wheel { position: relative; width: 96px; height: 96px; border: 3px solid var(--brass); border-radius: 50%; background: radial-gradient(circle, #2a382c 0 38%, #4d624f 39% 68%, #1e2820 69% 100%); box-shadow: inset 0 0 10px rgba(0,0,0,.65), 0 3px 10px rgba(0,0,0,.35); transition: transform .72s cubic-bezier(.34, 1.4, .64, 1), border-color .35s ease, box-shadow .35s ease; }
-.state-module.working .state-gear-wheel { border-color: var(--orange); box-shadow: 0 0 18px rgba(228, 119, 69, .32), inset 0 0 10px rgba(0,0,0,.65); }
-.state-tooth { position: absolute; top: calc(50% - 12px); left: calc(50% - 12px); width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid rgba(238, 230, 213, .32); border-radius: 50%; background: #1d261f; color: var(--muted); font-size: 8px; transition: border-color .3s ease, background .3s ease, color .3s ease; }
+.state-gear-housing { position: relative; display: grid; place-items: center; width: 112px; height: 112px; margin: 0 auto; }
+.state-gear-wheel { position: relative; width: 106px; height: 106px; border-radius: 50%; transition: transform .72s cubic-bezier(.34, 1.4, .64, 1), filter .35s ease; filter: drop-shadow(0 4px 8px rgba(0,0,0,.45)); }
+.state-module.working .state-gear-wheel { filter: drop-shadow(0 0 12px rgba(228, 119, 69, .45)); }
+.wheel-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.gear-rim.spur-rim { fill: #354739; stroke: var(--brass); stroke-width: 2.2; stroke-linejoin: bevel; }
+.gear-rim.ratchet-rim { fill: #4a3723; stroke: #c58b4e; stroke-width: 2.2; stroke-linejoin: miter; }
+.state-module.working .gear-rim.spur-rim, .operation-module.working .gear-rim.ratchet-rim { stroke: var(--orange); }
+.gear-inner-ring { fill: rgba(20, 18, 14, .55); stroke: rgba(238, 230, 213, .22); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.state-tooth { position: absolute; top: calc(50% - 11px); left: calc(50% - 11px); width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid rgba(238, 230, 213, .32); border-radius: 50%; background: #1d261f; color: var(--muted); font-size: 8px; z-index: 2; transition: border-color .3s ease, background .3s ease, color .3s ease; }
 .state-tooth b { display: block; font-size: 8px; font-weight: 700; transition: transform .72s cubic-bezier(.34, 1.4, .64, 1); }
 .state-tooth.active { border-color: var(--orange); background: #4a2a18; color: var(--orange); box-shadow: 0 0 8px rgba(228, 119, 69, .45); }
-.state-gear-wheel .wheel-hub { inset: 32px; transition: transform .72s cubic-bezier(.34, 1.4, .64, 1); }
+.state-gear-wheel .wheel-hub { inset: 35px; z-index: 2; transition: transform .72s cubic-bezier(.34, 1.4, .64, 1); }
 .state-gear-bench .state-wheel { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 10px; padding: 10px 6px 4px; }
 
 .stage-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
@@ -41,9 +46,11 @@ button { cursor: pointer; }
 .stage-pill.current .stage-num, .stage-pill.current strong { color: var(--orange); }
 .stage-pill.current small { color: var(--cream); }
 
-.ratchet-bench { display: grid; grid-template-columns: 74px 104px 74px; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px; }
+.ratchet-bench { display: grid; grid-template-columns: 74px 108px 74px; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px; }
 .pawl-stack, .right-mechanisms { display: flex; flex-direction: column; gap: 6px; }
-.input-pawl, .bell-indicator { padding: 6px 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, .2); transition: transform .42s ease, border-color .35s ease, background .35s ease, box-shadow .35s ease; }
+.input-pawl, .bell-indicator { position: relative; padding: 6px 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, .2); transition: transform .42s ease, border-color .35s ease, background .35s ease, box-shadow .35s ease; }
+.pawl-claw { position: absolute; right: -10px; top: calc(50% - 4px); width: 10px; height: 8px; background: var(--brass); clip-path: polygon(0 15%, 100% 50%, 0 85%); transition: background .35s ease, transform .35s ease; }
+.input-pawl.engaged .pawl-claw, .input-pawl.pushing .pawl-claw { background: var(--orange); transform: translateX(2px) rotate(12deg); }
 .input-pawl .pawl-tag, .bell-indicator .mech-tag { display: block; color: var(--muted); font-size: 9px; letter-spacing: .04em; }
 .input-pawl strong, .bell-indicator strong { display: block; margin-top: 2px; color: var(--cream); font-size: 11px; }
 .input-pawl.engaged { border-color: var(--brass); background: rgba(152, 106, 60, .2); }
@@ -53,20 +60,20 @@ button { cursor: pointer; }
 .bell-indicator.ringing { border-color: var(--orange); background: rgba(228, 119, 69, .32); box-shadow: 0 0 16px rgba(228, 119, 69, .55); animation: bell-shake .45s ease-in-out 2; }
 .bell-indicator.ringing strong { color: var(--orange); }
 @keyframes bell-shake { 0%, 100% { transform: rotate(0deg) scale(1); } 25% { transform: rotate(-8deg) scale(1.08); } 50% { transform: rotate(8deg) scale(1.1); } 75% { transform: rotate(-5deg) scale(1.05); } }
-.ratchet-housing { position: relative; display: grid; place-items: center; width: 104px; height: 104px; margin: 0 auto; }
-.index-pawl { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); z-index: 3; color: var(--orange); font-size: 13px; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
-.ratchet-wheel { position: relative; width: 92px; height: 92px; border: 3px solid var(--brass); border-radius: 50%; background: radial-gradient(circle, #382c1e 0 38%, #6d5030 39% 68%, #261e15 69% 100%); box-shadow: inset 0 0 10px rgba(0,0,0,.65), 0 3px 10px rgba(0,0,0,.35); transition: transform .72s cubic-bezier(.34, 1.4, .64, 1), border-color .35s ease, box-shadow .35s ease; }
-.operation-module.working .ratchet-wheel { border-color: var(--orange); box-shadow: 0 0 18px rgba(228, 119, 69, .32), inset 0 0 10px rgba(0,0,0,.65); }
-.wheel-notch { position: absolute; width: 28px; height: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(238,230,213,.32); border-radius: 50%; background: #221c15; color: var(--cream); font-size: 10px; line-height: 1; }
-.wheel-notch b { font-size: 11px; color: var(--cream); }
-.wheel-notch small { font-size: 7px; color: var(--muted); margin-top: 1px; }
+.ratchet-housing { position: relative; display: grid; place-items: center; width: 108px; height: 108px; margin: 0 auto; }
+.index-pawl { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); z-index: 4; color: var(--orange); font-size: 13px; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.ratchet-wheel { position: relative; width: 104px; height: 104px; border-radius: 50%; transition: transform .72s cubic-bezier(.34, 1.4, .64, 1), filter .35s ease; filter: drop-shadow(0 4px 8px rgba(0,0,0,.45)); }
+.operation-module.working .ratchet-wheel { filter: drop-shadow(0 0 12px rgba(228, 119, 69, .45)); }
+.wheel-notch { position: absolute; z-index: 2; width: 26px; height: 26px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(238,230,213,.32); border-radius: 50%; background: #221c15; color: var(--cream); font-size: 10px; line-height: 1; }
+.wheel-notch b { font-size: 10px; color: var(--cream); }
+.wheel-notch small { font-size: 6.5px; color: var(--muted); margin-top: 1px; }
 .wheel-notch.odd-cam { border-color: var(--orange); background: #4a2a18; }
 .wheel-notch.carry-cam { box-shadow: 0 0 0 2px rgba(228, 119, 69, .45); }
-.wheel-notch.n0 { top: 2px; left: calc(50% - 14px); }
-.wheel-notch.n1 { right: 2px; top: calc(50% - 14px); transform: rotate(90deg); }
-.wheel-notch.n2 { bottom: 2px; left: calc(50% - 14px); transform: rotate(180deg); }
-.wheel-notch.n3 { left: 2px; top: calc(50% - 14px); transform: rotate(270deg); }
-.wheel-hub { position: absolute; inset: 31px; border: 1px solid var(--brass); border-radius: 50%; display: grid; place-items: center; background: #191510; color: var(--orange); font-size: 10px; font-weight: 700; }
+.wheel-notch.n0 { top: 8px; left: calc(50% - 13px); }
+.wheel-notch.n1 { right: 8px; top: calc(50% - 13px); transform: rotate(90deg); }
+.wheel-notch.n2 { bottom: 8px; left: calc(50% - 13px); transform: rotate(180deg); }
+.wheel-notch.n3 { left: 8px; top: calc(50% - 13px); transform: rotate(270deg); }
+.wheel-hub { position: absolute; z-index: 2; inset: 35px; border: 1px solid var(--brass); border-radius: 50%; display: grid; place-items: center; background: #191510; color: var(--orange); font-size: 10px; font-weight: 700; }
 .carry-latch { padding: 6px; border: 1px solid var(--line); background: rgba(0, 0, 0, .2); text-align: center; transition: border-color .35s ease, background .35s ease, box-shadow .35s ease; }
 .carry-latch .latch-title { display: block; color: var(--muted); font-size: 9px; }
 .latch-track { position: relative; height: 10px; margin: 4px 2px; border: 1px solid rgba(238,230,213,.25); background: #171b16; overflow: hidden; }

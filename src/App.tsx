@@ -43,6 +43,44 @@ const mechanicalStages: Array<{ id: MechanicalPhase; action: PianoAction; step: 
   { id: 'STAMP_CARRY', action: 'setState5', step: '⑤', code: 'q5', title: '退格印進位', detail: '往左退格 → 釋放進位' },
 ]
 
+function polarPoint(angleRad: number, radius: number): string {
+  const x = (radius * Math.sin(angleRad)).toFixed(2)
+  const y = (-radius * Math.cos(angleRad)).toFixed(2)
+  return `${x},${y}`
+}
+
+function buildSpurGearPath(teeth = 14, outerR = 55, innerR = 45): string {
+  const step = (2 * Math.PI) / teeth
+  const commands: string[] = []
+  for (let i = 0; i < teeth; i += 1) {
+    const center = i * step
+    const p0 = polarPoint(center - step * 0.32, innerR)
+    const p1 = polarPoint(center - step * 0.19, outerR)
+    const p2 = polarPoint(center + step * 0.19, outerR)
+    const p3 = polarPoint(center + step * 0.32, innerR)
+    commands.push(`${i === 0 ? 'M' : 'L'} ${p0} L ${p1} L ${p2} L ${p3}`)
+  }
+  return `${commands.join(' ')} Z`
+}
+
+function buildRatchetWheelPath(teeth = 12, outerR = 56, innerR = 42): string {
+  const step = (2 * Math.PI) / teeth
+  const commands: string[] = []
+  for (let i = 0; i < teeth; i += 1) {
+    const start = i * step
+    const next = (i + 1) * step
+    // Steep radial locking cliff, then long asymmetric sawtooth ramp
+    const tip = polarPoint(start, outerR)
+    const gullet = polarPoint(start + step * 0.1, innerR)
+    const nextTip = polarPoint(next, outerR)
+    commands.push(`${i === 0 ? 'M' : 'L'} ${tip} L ${gullet} L ${nextTip}`)
+  }
+  return `${commands.join(' ')} Z`
+}
+
+const spurGearPath = buildSpurGearPath(14, 55, 45)
+const ratchetWheelPath = buildRatchetWheelPath(12, 56, 42)
+
 function playPhaseSound(snapshot: MachineSnapshot) {
   const phase = snapshot.gear?.phase
   if (phase === 'READ_A' || phase === 'READ_B') {
@@ -215,20 +253,24 @@ function App() {
       </section>
 
       <section className={`state-module module ${gearWorking ? 'working' : ''}`}>
-        <div className="module-heading"><span>STATE GEAR (主凸輪軸)</span><span>{stateSlotTitles[currentStateSlot]}</span></div>
+        <div className="module-heading"><span>STATE GEAR (正齒輪)</span><span>{stateSlotTitles[currentStateSlot]}</span></div>
         <div className="state-gear-bench">
           <div className="state-gear-housing">
-            <div className="index-pawl" title="狀態輪定位棘爪">▼</div>
+            <div className="index-pawl" title="狀態齒輪定位指標">▼</div>
             <div
               className="state-gear-wheel"
               style={{ transform: `rotate(${-stateIndex * stateStepDeg}deg)` }}
               aria-label={`State gear wheel at ${currentStateSlot}`}
             >
+              <svg className="wheel-svg spur-svg" viewBox="-60 -60 120 120" aria-hidden="true">
+                <path d={spurGearPath} className="gear-rim spur-rim" />
+                <circle cx="0" cy="0" r="41" className="gear-inner-ring" />
+              </svg>
               {stateNames.map((state, idx) => (
                 <span
                   key={state}
                   className={`state-tooth ${currentStateSlot === state ? 'active' : ''}`}
-                  style={{ transform: `rotate(${idx * stateStepDeg}deg) translateY(-38px)` }}
+                  style={{ transform: `rotate(${idx * stateStepDeg}deg) translateY(-33px)` }}
                 >
                   <b style={{ transform: `rotate(${stateIndex * stateStepDeg - idx * stateStepDeg}deg)` }}>
                     {state === 'HALT' ? 'HLT' : state}
@@ -251,30 +293,36 @@ function App() {
             ))}
           </div>
         </div>
-        <p className="module-note">主凸輪軸隨每動旋轉，也可按鋼琴左鍵 q0～q5 直接切換。</p>
+        <p className="module-note">對稱方齒正齒輪（Spur Gear），隨每動旋轉切換狀態。</p>
       </section>
 
       <section className={`operation-module module ${gearWorking ? 'working' : ''}`}>
-        <div className="module-heading"><span>ARITHMETIC GEAR (4-NOTCH RATCHET)</span><span>{gearPhaseLabel}</span></div>
+        <div className="module-heading"><span>ARITHMETIC RATCHET (斜齒棘輪)</span><span>{gearPhaseLabel}</span></div>
         <div className="ratchet-bench" aria-label="1900s 4-notch mechanical adder mechanism">
           <div className="pawl-stack">
             <div className={`input-pawl ${activePhase === 'READ_A' ? 'pushing' : ''} ${aBit === 1 ? 'engaged' : ''}`} aria-label="A input pawl">
               <span className="pawl-tag">① A 棘爪</span>
               <strong>{aBit === null ? '待命' : aBit === 1 ? '+1 齒' : '+0'}</strong>
+              <i className="pawl-claw" aria-hidden="true" />
             </div>
             <div className={`input-pawl ${activePhase === 'READ_B' ? 'pushing' : ''} ${bBit === 1 ? 'engaged' : ''}`} aria-label="B input pawl">
               <span className="pawl-tag">② B 棘爪</span>
               <strong>{bBit === null ? '待命' : bBit === 1 ? '+1 齒' : '+0'}</strong>
+              <i className="pawl-claw" aria-hidden="true" />
             </div>
           </div>
 
           <div className="ratchet-housing">
-            <div className="index-pawl" title="頂部定位棘爪 (Index Pawl)">▼</div>
+            <div className="index-pawl" title="頂部止回棘爪 (Locking Pawl)">▼</div>
             <div
               className={`ratchet-wheel notch-${ratchetNotch}`}
               style={{ transform: `rotate(${-ratchetNotch * 90}deg)` }}
               aria-label={`4-notch adder wheel at notch ${ratchetNotch}`}
             >
+              <svg className="wheel-svg ratchet-svg" viewBox="-60 -60 120 120" aria-hidden="true">
+                <path d={ratchetWheelPath} className="gear-rim ratchet-rim" />
+                <circle cx="0" cy="0" r="39" className="gear-inner-ring" />
+              </svg>
               <span className="wheel-notch n0"><b>0</b><small>00₂</small></span>
               <span className="wheel-notch n1 odd-cam"><b>1</b><small>01₂</small></span>
               <span className="wheel-notch n2 carry-cam"><b>2</b><small>10₂</small></span>
