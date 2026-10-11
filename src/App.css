@@ -17,32 +17,43 @@ button { cursor: pointer; }
 .tape-cell .position { font-size: 11px; }
 .tape-readout { font-size: 11px; }
 
-.gear-stage { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 88px; padding: 10px 14px 4px; color: var(--orange); }
-.gear { display: grid; place-items: center; width: 48px; height: 48px; border: 2px solid currentColor; border-radius: 50%; font-size: 30px; line-height: 1; opacity: .35; }
-.gear-link { color: var(--muted); font-size: 18px; }
-.gear-equation { margin: 0 14px 10px; padding: 9px 10px; border-left: 2px solid var(--orange); background: rgba(224, 119, 62, .08); }
-.gear-equation strong { display: block; color: var(--cream); font: 18px 'IBM Plex Mono', monospace; letter-spacing: .04em; }
-.gear-equation span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
-.operation-module.working .gear { opacity: 1; box-shadow: 0 0 16px rgba(224, 119, 62, .22); }
-.operation-module.working .gear-a { animation: gear-turn 3.6s linear infinite; }
-.operation-module.working .gear-b { animation: gear-turn-reverse 3.6s linear infinite; }
-.operation-module.working .gear-carry { animation: gear-turn 2.8s linear infinite; color: var(--cream); }
-.operation-module.working .gear-equation { animation: gear-pulse 1.8s ease-in-out infinite alternate; }
-@keyframes gear-turn { to { transform: rotate(360deg); } }
-@keyframes gear-turn-reverse { to { transform: rotate(-360deg); } }
-@keyframes gear-pulse { from { background: rgba(224, 119, 62, .08); } to { background: rgba(224, 119, 62, .2); } }
+.ratchet-bench { display: grid; grid-template-columns: 74px 104px 72px; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px; }
+.pawl-stack { display: flex; flex-direction: column; gap: 6px; }
+.input-pawl { padding: 6px 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, .2); transition: transform .25s ease, border-color .25s ease, background .25s ease; }
+.input-pawl .pawl-tag { display: block; color: var(--muted); font-size: 9px; letter-spacing: .04em; }
+.input-pawl strong { display: block; margin-top: 2px; color: var(--cream); font-size: 12px; }
+.input-pawl.engaged { border-color: var(--orange); background: rgba(228, 119, 69, .18); transform: translateX(4px); }
+.input-pawl.engaged strong { color: var(--orange); }
+.ratchet-housing { position: relative; display: grid; place-items: center; width: 104px; height: 104px; margin: 0 auto; }
+.index-pawl { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); z-index: 3; color: var(--orange); font-size: 13px; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.ratchet-wheel { position: relative; width: 92px; height: 92px; border: 3px solid var(--brass); border-radius: 50%; background: radial-gradient(circle, #382c1e 0 38%, #6d5030 39% 68%, #261e15 69% 100%); box-shadow: inset 0 0 10px rgba(0,0,0,.65), 0 3px 10px rgba(0,0,0,.35); transition: transform .48s cubic-bezier(.34, 1.56, .64, 1), border-color .25s ease, box-shadow .25s ease; }
+.operation-module.working .ratchet-wheel { border-color: var(--orange); box-shadow: 0 0 18px rgba(228, 119, 69, .32), inset 0 0 10px rgba(0,0,0,.65); }
+.wheel-notch { position: absolute; width: 28px; height: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(238,230,213,.32); border-radius: 50%; background: #221c15; color: var(--cream); font-size: 10px; line-height: 1; }
+.wheel-notch b { font-size: 11px; color: var(--cream); }
+.wheel-notch small { font-size: 7px; color: var(--muted); margin-top: 1px; }
+.wheel-notch.odd-cam { border-color: var(--orange); background: #4a2a18; }
+.wheel-notch.carry-cam { box-shadow: 0 0 0 2px rgba(228, 119, 69, .45); }
+.wheel-notch.n0 { top: 2px; left: calc(50% - 14px); }
+.wheel-notch.n1 { right: 2px; top: calc(50% - 14px); transform: rotate(90deg); }
+.wheel-notch.n2 { bottom: 2px; left: calc(50% - 14px); transform: rotate(180deg); }
+.wheel-notch.n3 { left: 2px; top: calc(50% - 14px); transform: rotate(270deg); }
+.wheel-hub { position: absolute; inset: 31px; border: 1px solid var(--brass); border-radius: 50%; display: grid; place-items: center; background: #191510; color: var(--orange); font-size: 10px; font-weight: 700; }
+.carry-latch { padding: 7px 6px; border: 1px solid var(--line); background: rgba(0, 0, 0, .2); text-align: center; transition: border-color .25s ease, background .25s ease; }
+.carry-latch .latch-title { display: block; color: var(--muted); font-size: 9px; }
+.latch-track { position: relative; height: 12px; margin: 6px 2px; border: 1px solid rgba(238,230,213,.25); background: #171b16; overflow: hidden; }
+.latch-bolt { width: 52%; height: 100%; background: var(--brass); transition: transform .35s cubic-bezier(.34, 1.56, .64, 1), background .25s ease; transform: translateX(0); }
+.carry-latch strong { display: block; color: var(--muted); font-size: 10px; letter-spacing: .04em; }
+.carry-latch.latched { border-color: var(--orange); background: rgba(228, 119, 69, .18); }
+.carry-latch.latched .latch-bolt { transform: translateX(92%); background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+.carry-latch.latched strong { color: var(--orange); }
+.gear-equation { margin: 0 14px 10px; padding: 8px 10px; border-left: 2px solid var(--orange); background: rgba(224, 119, 62, .08); }
+.gear-equation strong { display: block; color: var(--cream); font: 15px 'IBM Plex Mono', monospace; letter-spacing: .02em; }
+.gear-equation span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .tape-window { position: relative; }
 .tape-module.scanning .tape-window::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--orange); box-shadow: 0 0 14px var(--orange); animation: scan-sweep 2.4s ease-in-out infinite alternate; }
 .tape-module.scanning .tape-cell.selected { animation: scan-cell 1.2s ease-in-out infinite alternate; }
 .tape-module.scanning .needle { animation: scan-needle .8s ease-in-out infinite alternate; }
-.phase-add .gear-a, .phase-add .gear-b { color: var(--cream); }
-.phase-carry .gear-carry { color: var(--orange); transform: scale(1.12); }
-.phase-write .gear-equation { border-left-width: 4px; color: var(--cream); }
 @keyframes scan-sweep { from { left: 0; } to { left: calc(100% - 3px); } }
 @keyframes scan-cell { from { background: rgba(244, 218, 165, .42); } to { background: rgba(244, 218, 165, .9); } }
 @keyframes scan-needle { from { transform: translateY(-2px); } to { transform: translateY(5px); } }
-.gear { position: relative; border: 0; border-radius: 50%; background: repeating-conic-gradient(currentColor 0deg 12deg, transparent 12deg 30deg); font-size: 0; }
-.gear::before { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: currentColor; }
-.gear i { position: absolute; z-index: 1; inset: 17px; border: 3px solid #2b3025; border-radius: 50%; background: transparent; }
-.gear-carry i { border-color: #2b3025; }
 @media (max-width: 700px) { .app-shell { padding: 18px 14px; overflow: visible; }.masthead h1 { font-size: 20px; }.machine-board { display: flex; flex-direction: column; }.state-module { order: 1; }.tape-module { order: 2; }.operation-module { order: 3; }.piano-module { margin-top: 16px; }.keybed { height: 125px; min-width: 650px; }.piano-wrap { overflow-x: auto; }.piano-guide { gap: 8px 14px; font-size: 9px; }.run-status { align-items: flex-start; flex-direction: column; }.app-shell footer { display: block; line-height: 2; } }
