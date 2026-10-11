@@ -192,14 +192,20 @@ function App() {
   const isProbing = activePhase === 'READ_A' || activePhase === 'READ_B'
   const currentCellSymbol = machine.tape[machine.head]
   const probeDropThrough = isProbing && currentCellSymbol === '1'
-  const probeBlocked = isProbing && currentCellSymbol !== '1'
-  const probeStatusText = hammerPunching
-    ? `🔨 衝頭打孔 (${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head})`
-    : probeDropThrough
-      ? '▼ 探針穿孔 · 氣閥進氣 (+1齒)'
-      : probeBlocked
-        ? '▽ 紙帶擋住探針 · 氣閥密封 (+0)'
-        : `${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head} · TRACKER BAR`
+  const probeBlocked = isProbing && currentCellSymbol === '0'
+  const isSeparatorCell = currentCellSymbol === 'separator'
+  const isEqualsCell = currentCellSymbol === 'equals'
+  const probeStatusText = isEqualsCell
+    ? '🔔 雙橫槽孔 (=) · 觸發銅鈴與結果打孔'
+    : isSeparatorCell
+      ? '⊞ 分隔雙方孔 (#) · 切換 A → B 棘爪軌道'
+      : hammerPunching
+        ? `🔨 衝頭打孔 (${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head})`
+        : probeDropThrough
+          ? '● 單圓孔穿通 (1) · 氣閥進氣 (+1齒)'
+          : probeBlocked || currentCellSymbol === '0'
+            ? '○ 無孔紙面 (0) · 擋住探針 (+0)'
+            : `${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head} · TRACKER BAR`
 
   return <main className="app-shell">
     <header className="masthead"><div className="brand-mark">PTM<i /></div><div><p className="eyebrow">A MECHANICAL COMPUTING INSTRUMENT</p><h1>Piano <em>Turing</em> Machine</h1></div><div className={`machine-status ${running ? 'live' : ''}`}><span />{running ? 'PLAYING' : machine.halted ? 'HALT' : 'READY'}</div></header>
@@ -231,7 +237,7 @@ function App() {
         <div className="module-heading"><span>TAPE + TRACKER BAR</span><span>{probeStatusText}</span></div>
         <div className="tape-window">
           <div
-            className={`playhead-frame ${hammerPunching ? 'punching' : ''} ${probeDropThrough ? 'probe-open' : ''} ${probeBlocked ? 'probe-blocked' : ''}`}
+            className={`playhead-frame ${hammerPunching ? 'punching' : ''} ${probeDropThrough ? 'probe-open' : ''} ${probeBlocked ? 'probe-blocked' : ''} ${isSeparatorCell ? 'probe-separator' : ''} ${isEqualsCell ? 'probe-equals' : ''}`}
             aria-hidden="true"
           >
             <div className="feeler-pin">
@@ -240,7 +246,17 @@ function App() {
             </div>
             <div className="tracker-port">
               <i className="port-nozzle" />
-              <span>{probeDropThrough ? 'AIR IN' : hammerPunching ? 'STAMP' : 'VACUUM'}</span>
+              <span>
+                {probeDropThrough
+                  ? 'AIR IN (1)'
+                  : isSeparatorCell
+                    ? 'SHIFT (#)'
+                    : isEqualsCell
+                      ? 'BELL (=)'
+                      : hammerPunching
+                        ? 'STAMP'
+                        : 'SEALED'}
+              </span>
             </div>
           </div>
           <div
@@ -251,17 +267,29 @@ function App() {
               const rawSym = machine.tape[position]
               const symbol = formatTapeSymbol(rawSym)
               const isSelected = position === machine.head
-              const isOneHole = rawSym === '1'
+              const holeType =
+                rawSym === '1'
+                  ? 'open-hole'
+                  : rawSym === '0'
+                    ? 'solid-mark'
+                    : rawSym === 'separator'
+                      ? 'separator-holes'
+                      : rawSym === 'equals'
+                        ? 'equals-holes'
+                        : ''
               return (
                 <div
-                  className={`tape-cell ${isSelected ? 'selected' : ''} ${rawSym ? 'punched' : ''} ${isOneHole ? 'hole-one' : ''} ${rawSym === 'equals' ? 'equals-cell' : ''}`}
+                  className={`tape-cell ${isSelected ? 'selected' : ''} ${rawSym ? `punched sym-${rawSym}` : ''}`}
                   key={position}
                   style={{ '--cell-pos': position } as React.CSSProperties}
                 >
                   <span className="sprocket top" aria-hidden="true" />
                   <span className="position">{position}</span>
-                  <span className={`data-hole ${isOneHole ? 'open-hole' : rawSym === '0' ? 'solid-mark' : ''}`} aria-hidden="true" />
+                  <span className={`data-hole ${holeType}`} aria-hidden="true" />
                   <strong key={`${position}-${symbol}`}>{symbol}</strong>
+                  <span className="hole-caption" aria-hidden="true">
+                    {rawSym === '1' ? '● 穿孔' : rawSym === '0' ? '○ 無孔' : rawSym === 'separator' ? '⊞ 分隔孔' : rawSym === 'equals' ? '🔔 結算孔' : ''}
+                  </span>
                   {isSelected && <span className="needle">⌄</span>}
                   <span className="sprocket bottom" aria-hidden="true" />
                 </div>
