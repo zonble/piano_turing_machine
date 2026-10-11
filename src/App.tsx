@@ -81,6 +81,13 @@ function buildRatchetWheelPath(teeth = 12, outerR = 56, innerR = 42): string {
 const spurGearPath = buildSpurGearPath(14, 55, 45)
 const ratchetWheelPath = buildRatchetWheelPath(12, 56, 42)
 
+const actionToKeyIndex = Object.fromEntries(
+  Object.entries(pianoActions).map(([shortcut, action]) => {
+    const whiteIdx = whiteKeyboardMap.indexOf(shortcut)
+    return [action, whiteIdx >= 0 ? whiteKeyIndices[whiteIdx] : 19]
+  }),
+) as Record<PianoAction, number>
+
 function playPhaseSound(snapshot: MachineSnapshot) {
   const phase = snapshot.gear?.phase
   if (phase === 'READ_A' || phase === 'READ_B') {
@@ -105,20 +112,17 @@ function App() {
   const [pressedKey, setPressedKey] = useState<number | null>(null)
   const cells = useMemo(() => tapePositions(machine.head), [machine.head])
 
-  const soundForAction = (action: PianoAction) => {
-    const midi = action === 'moveLeft' ? 48 : action === 'moveRight' ? 60 : action === 'write1' ? 67 : action === 'play' ? 72 : 64
-    playTone(pianoFrequency(midi), .18, action === 'play' ? 'sine' : 'triangle')
-  }
-
   const dispatch = (action: PianoAction, keyIndex?: number) => {
+    const resolvedKeyIndex = keyIndex ?? actionToKeyIndex[action]
     const next = applyPianoAction(machine, action)
     setMachine(next)
+    playTone(pianoFrequency(41 + resolvedKeyIndex))
     if ((action === 'play' || action === 'step' || action.startsWith('setState')) && next.gear?.phase) {
       playPhaseSound(next)
-    } else if (keyIndex === undefined) {
-      soundForAction(action)
-    } else {
-      playTone(pianoFrequency(41 + keyIndex), .18, 'triangle')
+    }
+    if (keyIndex === undefined) {
+      setPressedKey(resolvedKeyIndex)
+      window.setTimeout(() => setPressedKey(null), 180)
     }
     if (action === 'play' && !next.halted && next.program) setRunning(true)
     if (action === 'step' || action.startsWith('setState') || action === 'stop' || action === 'reset' || next.halted) setRunning(false)
@@ -130,7 +134,16 @@ function App() {
       setMachine((current) => {
         const next = runStep(current)
         if (next.halted) setRunning(false)
-        if (next.gear?.phase) playPhaseSound(next)
+        if (next.gear?.phase) {
+          const stage = mechanicalStages.find((s) => s.id === next.gear?.phase)
+          if (stage) {
+            const stageKeyIdx = actionToKeyIndex[stage.action]
+            setPressedKey(stageKeyIdx)
+            window.setTimeout(() => setPressedKey(null), 180)
+            playTone(pianoFrequency(41 + stageKeyIdx))
+          }
+          playPhaseSound(next)
+        }
         return next
       })
     }, 1000 / speed)
@@ -139,16 +152,22 @@ function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const action = pianoActions[event.key.toLowerCase()]
-      if (!action || event.repeat) return
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return
+      const pressed = event.key.toLowerCase()
+      const whiteIndex = whiteKeyboardMap.indexOf(pressed)
+      const action = pianoActions[pressed]
+      if (!action && whiteIndex < 0) return
       event.preventDefault()
-      const whiteIndex = whiteKeyboardMap.indexOf(event.key.toLowerCase())
       const keyIndex = whiteIndex >= 0 ? whiteKeyIndices[whiteIndex] : undefined
       if (keyIndex !== undefined) {
         setPressedKey(keyIndex)
         window.setTimeout(() => setPressedKey(null), 180)
       }
-      dispatch(action, keyIndex)
+      if (action) {
+        dispatch(action, keyIndex)
+      } else if (keyIndex !== undefined) {
+        playTone(pianoFrequency(41 + keyIndex))
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -315,7 +334,7 @@ function App() {
                 <span
                   key={state}
                   className={`state-tooth ${currentStateSlot === state ? 'active' : ''}`}
-                  style={{ transform: `rotate(${idx * stateStepDeg}deg) translateY(-33px)` }}
+                  style={{ transform: `rotate(${idx * stateStepDeg}deg) translateY(-49px)` }}
                 >
                   <b style={{ transform: `rotate(${stateIndex * stateStepDeg - idx * stateStepDeg}deg)` }}>
                     {state === 'HALT' ? 'HLT' : state}
@@ -392,7 +411,7 @@ function App() {
       </section>
     </section>
 
-    <section className="piano-module module"><div className="module-heading"><span>PIANO CONTROL</span><span>白鍵是機器功能</span></div><div className="piano-wrap"><div className="piano"><div className="keybed">{keyNames.map((name, index) => { const whiteIndex = whiteKeyIndices.indexOf(index); const key = whiteIndex >= 0 ? whiteKeyboardMap[whiteIndex] : ''; const action = key ? pianoActions[key] : undefined; const label = whiteIndex >= 0 ? whiteLabels[whiteIndex] : ''; const active = pressedKey === index; return <button key={`${name}-${index}`} className={`piano-key ${blackKeys.has(name) ? 'black' : 'white'} ${active ? 'active' : ''}`} title={`${label || 'melody'}${key ? ` · ${key}` : ''}`} aria-label={`${label || 'melody'}${key ? ` · ${key}` : ''}`} onClick={() => { setPressedKey(index); window.setTimeout(() => setPressedKey(null), 180); if (action) dispatch(action, index); else playTone(pianoFrequency(41 + index), .18, 'triangle') }}><span>{label || name}</span><small>{key}</small></button> })}</div></div></div><div className="piano-guide"><span><b>←</b> move</span><span><b>0 1 #</b> write</span><span><b>⏭</b> step</span><span><b>▶</b> play</span><span><b>⏹</b> stop</span></div></section>
+    <section className="piano-module module"><div className="module-heading"><span>PIANO CONTROL</span><span>白鍵是機器功能</span></div><div className="piano-wrap"><div className="piano"><div className="keybed">{keyNames.map((name, index) => { const whiteIndex = whiteKeyIndices.indexOf(index); const key = whiteIndex >= 0 ? whiteKeyboardMap[whiteIndex] : ''; const action = key ? pianoActions[key] : undefined; const label = whiteIndex >= 0 ? whiteLabels[whiteIndex] : ''; const active = pressedKey === index; return <button key={`${name}-${index}`} className={`piano-key ${blackKeys.has(name) ? 'black' : 'white'} ${active ? 'active' : ''}`} title={`${label || 'melody'}${key ? ` · ${key}` : ''}`} aria-label={`${label || 'melody'}${key ? ` · ${key}` : ''}`} onClick={() => { setPressedKey(index); window.setTimeout(() => setPressedKey(null), 180); if (action) dispatch(action, index); else playTone(pianoFrequency(41 + index)) }}><span>{label || name}</span><small>{key}</small></button> })}</div></div></div><div className="piano-guide"><span><b>←</b> move</span><span><b>0 1 #</b> write</span><span><b>⏭</b> step</span><span><b>▶</b> play</span><span><b>⏹</b> stop</span></div></section>
     <p className="one-plus-one">1 + 1：<b>1</b> → <b>→</b> → <b>#</b> → <b>→</b> → <b>1</b> → <b>▶</b>（或連按 <b>⏭</b> 逐步分解）</p>
 
     <section className="run-module module"><div className="module-heading"><span>MECHANICAL READOUT</span><span>{machine.lastEvent?.message ?? '請用鋼琴輸入 1#1'}</span></div><div className="run-status"><strong>{machine.state}</strong><span>{machine.halted && machine.result ? `${rawTape} （${machine.result.binary}₂ = ${machine.result.decimal}₁₀ = ${machine.result.octal}₈）` : `Tape: ${rawTape || 'blank'}`}</span></div><label>速度 <b>{speed} steps / sec</b><input type="range" min="0.5" max="6" step="0.5" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} /></label></section>
