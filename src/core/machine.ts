@@ -1,10 +1,11 @@
 import { parseOperationInput } from './operations'
 
-export type TapeSymbol = '0' | '1' | 'separator'
+export type TapeSymbol = '0' | '1' | 'separator' | 'equals'
 export type StateId = 'INPUT' | 'SCAN' | 'ADD' | 'CARRY' | 'WRITE' | 'HALT' | 'q0' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5'
 export type PianoAction = 'setState0' | 'setState1' | 'setState2' | 'setState3' | 'setState4' | 'setState5' | 'write0' | 'write1' | 'writeSeparator' | 'blank' | 'moveLeft' | 'moveRight' | 'step' | 'play' | 'stop' | 'reset'
 export type MachineResult = { binary: string; decimal: number; octal: string }
 export type MachineEvent = { state: StateId; message: string; action?: PianoAction }
+export type MechanicalPhase = 'READ_A' | 'READ_B' | 'BELL_EQ' | 'STAMP_SUM' | 'STAMP_CARRY'
 export type GearState = {
   aBit: 0 | 1
   bBit: 0 | 1
@@ -12,6 +13,9 @@ export type GearState = {
   ratchetTotal: 0 | 1 | 2 | 3
   sumBit: 0 | 1
   carryOut: 0 | 1
+  phase?: MechanicalPhase
+  bellRung?: boolean
+  punching?: boolean
 }
 export type MachineSnapshot = {
   operation: 'add'
@@ -25,7 +29,7 @@ export type MachineSnapshot = {
   result?: MachineResult
   error?: string
   lastEvent?: MachineEvent
-  program?: { result: string; writeIndex: number; gear: GearState }
+  program?: { result: string; writeIndex: number; eqPos: number; gear: GearState }
 }
 
 export const pianoActions: Record<string, PianoAction> = {
@@ -66,8 +70,18 @@ export const pianoActionLabels: Record<PianoAction, string> = {
   reset: '↺',
 }
 
+export function formatTapeSymbol(symbol?: TapeSymbol): string {
+  if (symbol === 'separator') return '#'
+  if (symbol === 'equals') return '='
+  return symbol ?? '□'
+}
+
 export function tapeText(tape: Record<number, TapeSymbol>): string {
-  return Object.keys(tape).map(Number).sort((a, b) => a - b).map((position) => tape[position] === 'separator' ? '#' : tape[position]).join('')
+  return Object.keys(tape)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((position) => formatTapeSymbol(tape[position]))
+    .join('')
 }
 
 export function createInitialMachine(): MachineSnapshot {
@@ -101,7 +115,10 @@ function invalidInput(snapshot: MachineSnapshot): MachineSnapshot {
 }
 
 function tapeBounds(tape: Record<number, TapeSymbol>): { first: number; separator: number; last: number } {
-  const positions = Object.keys(tape).map(Number).sort((a, b) => a - b)
+  const positions = Object.keys(tape)
+    .map(Number)
+    .filter((pos) => tape[pos] === '0' || tape[pos] === '1' || tape[pos] === 'separator')
+    .sort((a, b) => a - b)
   const first = positions[0] ?? 0
   const last = positions[positions.length - 1] ?? 2
   const separator = positions.find((pos) => tape[pos] === 'separator') ?? Math.floor((first + last) / 2)
@@ -115,15 +132,25 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
   }
   if (action === 'stop') return { ...snapshot, halted: true, state: 'HALT', lastEvent: { state: 'HALT', message: 'Stopped by operator.', action } }
   if (action.startsWith('setState')) { const state = `q${action.slice(-1)}` as StateId; return { ...snapshot, state, error: undefined, lastEvent: { state, message: `State register set to ${state}.`, action } } }
-  const tape = { ...snapshot.tape }
+
+  let tape = { ...snapshot.tape }
+  let baseHead = snapshot.head
   const editingHaltedTape = snapshot.halted && ['write0', 'write1', 'writeSeparator', 'blank', 'moveLeft', 'moveRight'].includes(action)
   if (snapshot.halted && !editingHaltedTape) return snapshot
-  if (action === 'write0') tape[snapshot.head] = '0'
-  if (action === 'write1') tape[snapshot.head] = '1'
-  if (action === 'writeSeparator') tape[snapshot.head] = 'separator'
-  if (action === 'blank') delete tape[snapshot.head]
+  if (editingHaltedTape && snapshot.result && Object.values(tape).includes('equals')) {
+    tape = {}
+    for (let i = 0; i < snapshot.result.binary.length; i += 1) {
+      tape[i] = snapshot.result.binary[i] as '0' | '1'
+    }
+    baseHead = snapshot.result.binary.length - 1
+  }
+
+  if (action === 'write0') tape[baseHead] = '0'
+  if (action === 'write1') tape[baseHead] = '1'
+  if (action === 'writeSeparator') tape[baseHead] = 'separator'
+  if (action === 'blank') delete tape[baseHead]
   if (action === 'moveLeft' || action === 'moveRight' || action === 'write0' || action === 'write1' || action === 'writeSeparator' || action === 'blank') {
-    const nextHead = action === 'moveLeft' ? snapshot.head - 1 : action === 'moveRight' ? snapshot.head + 1 : snapshot.head
+    const nextHead = action === 'moveLeft' ? baseHead - 1 : action === 'moveRight' ? baseHead + 1 : baseHead
     return { ...snapshot, tape, head: nextHead, state: editingHaltedTape ? 'INPUT' : snapshot.state, halted: false, gear: editingHaltedTape ? undefined : snapshot.gear, result: editingHaltedTape ? undefined : snapshot.result, program: editingHaltedTape ? undefined : snapshot.program, error: undefined, lastEvent: { state: editingHaltedTape ? 'INPUT' : snapshot.state, message: editingHaltedTape ? `${pianoActionLabels[action]} Result Tape is editable.` : pianoActionLabels[action], action } }
   }
   if (action === 'play') {
@@ -132,7 +159,34 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
     const gear = computeGearForInput(text, 0)
     if (!result || !gear) return invalidInput(snapshot)
     const bounds = tapeBounds(snapshot.tape)
-    return { ...snapshot, state: 'SCAN', head: bounds.first, step: snapshot.step + 1, carry: 0, gear: undefined, error: undefined, result: undefined, program: { result: result.binary, writeIndex: 0, gear }, lastEvent: { state: 'SCAN', message: 'Scan the two operands from the Tape.', action } }
+    const eqPos = bounds.last + 1
+    const scanAGear: GearState = {
+      aBit: gear.aBit,
+      bBit: 0,
+      carryIn: 0,
+      ratchetTotal: gear.aBit,
+      sumBit: gear.aBit,
+      carryOut: 0,
+      phase: 'READ_A',
+      bellRung: false,
+      punching: false,
+    }
+    return {
+      ...snapshot,
+      state: 'SCAN',
+      head: bounds.first,
+      step: snapshot.step + 1,
+      carry: 0,
+      gear: scanAGear,
+      error: undefined,
+      result: undefined,
+      program: { result: result.binary, writeIndex: result.binary.length - 1, eqPos, gear },
+      lastEvent: {
+        state: 'SCAN',
+        message: `① 讀取 A：讀寫頭移至 A(${gear.aBit})，A 棘爪將棘輪推至第 ${gear.aBit} 格。`,
+        action,
+      },
+    }
   }
   if (action === 'step') return runStep(snapshot)
   return snapshot
@@ -140,74 +194,113 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
 
 export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
   if (snapshot.halted || !snapshot.program) return snapshot
-  const { gear } = snapshot.program
+  const { gear, eqPos, result: binaryResult } = snapshot.program
   const bounds = tapeBounds(snapshot.tape)
+
   if (snapshot.state === 'SCAN') {
     return {
       ...snapshot,
       state: 'ADD',
       head: bounds.last,
-      gear,
+      carry: gear.carryOut,
+      gear: { ...gear, phase: 'READ_B', bellRung: false, punching: false },
       step: snapshot.step + 1,
       lastEvent: {
         state: 'ADD',
-        message: `棘爪推進 A(${gear.aBit}) + B(${gear.bBit}) + C(${gear.carryIn}) → 加法棘輪轉至第 ${gear.ratchetTotal} 格。`,
+        message: `② 讀取 B：讀寫頭移至 B(${gear.bBit})，B 棘爪將棘輪推至第 ${gear.ratchetTotal} 格${gear.carryOut ? '，頂出進位栓 LOCK 1' : ''}。`,
       },
     }
   }
+
   if (snapshot.state === 'ADD') {
-    const binSum = gear.ratchetTotal.toString(2).padStart(2, '0')
-    return {
-      ...snapshot,
-      state: 'CARRY',
-      head: bounds.separator,
-      carry: gear.carryOut,
-      gear,
-      step: snapshot.step + 1,
-      lastEvent: {
-        state: 'CARRY',
-        message: `${gear.aBit} + ${gear.bBit} + ${gear.carryIn} = ${binSum}₂：奇偶凸輪寫入 ${gear.sumBit}，進位栓設為 ${gear.carryOut}。`,
-      },
-    }
-  }
-  if (snapshot.state === 'CARRY') {
-    return {
-      ...snapshot,
-      state: 'WRITE',
-      tape: {},
-      head: 0,
-      gear,
-      step: snapshot.step + 1,
-      lastEvent: {
-        state: 'WRITE',
-        message: gear.carryOut ? '進位栓釋放 1 推入下一欄，準備寫入結果 Tape。' : '進位栓保持 0，準備寫入結果 Tape。',
-      },
-    }
-  }
-  const bit = snapshot.program.result[snapshot.program.writeIndex] as '0' | '1'
-  const tape = { ...snapshot.tape, [snapshot.program.writeIndex]: bit }
-  const done = snapshot.program.writeIndex === snapshot.program.result.length - 1
-  if (done) {
-    const value = BigInt(`0b${snapshot.program.result}`)
+    const tape = { ...snapshot.tape, [eqPos]: 'equals' as const }
     return {
       ...snapshot,
       tape,
+      state: 'CARRY',
+      head: eqPos,
+      carry: gear.carryOut,
+      gear: { ...gear, phase: 'BELL_EQ', bellRung: true, punching: true },
+      step: snapshot.step + 1,
+      lastEvent: {
+        state: 'CARRY',
+        message: `③ 當——！讀完 A 與 B 敲響銅鈴，在紙帶印下「=」（棘輪停在第 ${gear.ratchetTotal} 格）。`,
+      },
+    }
+  }
+
+  if (snapshot.state === 'CARRY') {
+    const writeIndex = snapshot.program.writeIndex
+    const targetPos = eqPos + 1 + writeIndex
+    const bit = binaryResult[writeIndex] as '0' | '1'
+    const tape = { ...snapshot.tape, [targetPos]: bit }
+    const done = writeIndex === 0
+    if (done) {
+      const value = BigInt(`0b${binaryResult}`)
+      return {
+        ...snapshot,
+        tape,
+        head: targetPos,
+        state: 'HALT',
+        halted: true,
+        carry: 0,
+        gear: { ...gear, phase: 'STAMP_SUM', bellRung: false, punching: true },
+        step: snapshot.step + 1,
+        result: { binary: binaryResult, decimal: Number(value), octal: value.toString(8) },
+        lastEvent: {
+          state: 'HALT',
+          message: `④ 奇偶凸輪打孔：在個位格印下 ${bit}，無進位，算式完成！`,
+        },
+      }
+    }
+    return {
+      ...snapshot,
+      tape,
+      head: targetPos,
+      state: 'WRITE',
+      gear: { ...gear, phase: 'STAMP_SUM', bellRung: false, punching: true },
+      step: snapshot.step + 1,
+      program: { ...snapshot.program, writeIndex: writeIndex - 1 },
+      lastEvent: {
+        state: 'WRITE',
+        message: `④ 奇偶凸輪打孔：棘輪第 ${gear.ratchetTotal} 格（${gear.sumBit === 1 ? '奇數凸齒' : '偶數凹槽'}）在個位格印下 ${bit}。`,
+      },
+    }
+  }
+
+  const writeIndex = snapshot.program.writeIndex
+  const targetPos = eqPos + 1 + writeIndex
+  const bit = binaryResult[writeIndex] as '0' | '1'
+  const tape = { ...snapshot.tape, [targetPos]: bit }
+  const done = writeIndex === 0
+  if (done) {
+    const value = BigInt(`0b${binaryResult}`)
+    return {
+      ...snapshot,
+      tape,
+      head: targetPos,
       state: 'HALT',
       halted: true,
       carry: 0,
-      gear,
+      gear: { ...gear, carryOut: 0, ratchetTotal: 0, phase: 'STAMP_CARRY', bellRung: false, punching: true },
       step: snapshot.step + 1,
-      result: { binary: snapshot.program.result, decimal: Number(value), octal: value.toString(8) },
-      lastEvent: { state: 'HALT', message: 'Result written. The machine halts.' },
+      result: { binary: binaryResult, decimal: Number(value), octal: value.toString(8) },
+      lastEvent: {
+        state: 'HALT',
+        message: `⑤ 釋放進位栓：讀寫頭往左退一格，進位栓彈回 FREE 0 並打孔印下進位 ${bit}，算式完成！`,
+      },
     }
   }
   return {
     ...snapshot,
     tape,
-    head: snapshot.program.writeIndex + 1,
-    gear,
+    head: targetPos,
+    gear: { ...gear, phase: 'STAMP_CARRY', bellRung: false, punching: true },
     step: snapshot.step + 1,
-    program: { ...snapshot.program, writeIndex: snapshot.program.writeIndex + 1 },
-    lastEvent: { state: 'WRITE', message: `Write result bit ${bit}.` },
+    program: { ...snapshot.program, writeIndex: writeIndex - 1 },
+    lastEvent: {
+      state: 'WRITE',
+      message: `⑤ 往左移一格打孔印下高位 ${bit}。`,
+    },
   }
 }
