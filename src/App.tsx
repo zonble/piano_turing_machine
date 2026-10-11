@@ -189,6 +189,18 @@ function App() {
   const stateIndex = Math.max(0, stateNames.indexOf(currentStateSlot))
   const stateStepDeg = 360 / stateNames.length
 
+  const isProbing = activePhase === 'READ_A' || activePhase === 'READ_B'
+  const currentCellSymbol = machine.tape[machine.head]
+  const probeDropThrough = isProbing && currentCellSymbol === '1'
+  const probeBlocked = isProbing && currentCellSymbol !== '1'
+  const probeStatusText = hammerPunching
+    ? `🔨 衝頭打孔 (${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head})`
+    : probeDropThrough
+      ? '▼ 探針穿孔 · 氣閥進氣 (+1齒)'
+      : probeBlocked
+        ? '▽ 紙帶擋住探針 · 氣閥密封 (+0)'
+        : `${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head} · TRACKER BAR`
+
   return <main className="app-shell">
     <header className="masthead"><div className="brand-mark">PTM<i /></div><div><p className="eyebrow">A MECHANICAL COMPUTING INSTRUMENT</p><h1>Piano <em>Turing</em> Machine</h1></div><div className={`machine-status ${running ? 'live' : ''}`}><span />{running ? 'PLAYING' : machine.halted ? 'HALT' : 'READY'}</div></header>
 
@@ -215,25 +227,40 @@ function App() {
     </section>
 
     <section className="machine-board">
-      <section className={`tape-module module ${machine.state === 'SCAN' ? 'scanning' : ''} ${bellRinging ? 'bell-flash' : ''}`}>
-        <div className="module-heading"><span>TAPE + HEAD</span><span>{currentSymbol} AT {machine.head >= 0 ? '+' : ''}{machine.head}</span></div>
+      <section className={`tape-module module ${isProbing ? 'probing' : ''} ${bellRinging ? 'bell-flash' : ''}`}>
+        <div className="module-heading"><span>TAPE + TRACKER BAR</span><span>{probeStatusText}</span></div>
         <div className="tape-window">
-          <div className={`playhead-frame ${hammerPunching ? 'punching' : ''}`} aria-hidden="true" />
+          <div
+            className={`playhead-frame ${hammerPunching ? 'punching' : ''} ${probeDropThrough ? 'probe-open' : ''} ${probeBlocked ? 'probe-blocked' : ''}`}
+            aria-hidden="true"
+          >
+            <div className="feeler-pin">
+              <i className="pin-spring" />
+              <span className="pin-tip">▼</span>
+            </div>
+            <div className="tracker-port">
+              <i className="port-nozzle" />
+              <span>{probeDropThrough ? 'AIR IN' : hammerPunching ? 'STAMP' : 'VACUUM'}</span>
+            </div>
+          </div>
           <div
             className="tape-cells"
             style={{ '--head': machine.head } as React.CSSProperties}
           >
             {cells.map((position) => {
-              const symbol = formatTapeSymbol(machine.tape[position])
+              const rawSym = machine.tape[position]
+              const symbol = formatTapeSymbol(rawSym)
               const isSelected = position === machine.head
+              const isOneHole = rawSym === '1'
               return (
                 <div
-                  className={`tape-cell ${isSelected ? 'selected' : ''} ${machine.tape[position] ? 'punched' : ''} ${machine.tape[position] === 'equals' ? 'equals-cell' : ''}`}
+                  className={`tape-cell ${isSelected ? 'selected' : ''} ${rawSym ? 'punched' : ''} ${isOneHole ? 'hole-one' : ''} ${rawSym === 'equals' ? 'equals-cell' : ''}`}
                   key={position}
                   style={{ '--cell-pos': position } as React.CSSProperties}
                 >
                   <span className="sprocket top" aria-hidden="true" />
                   <span className="position">{position}</span>
+                  <span className={`data-hole ${isOneHole ? 'open-hole' : rawSym === '0' ? 'solid-mark' : ''}`} aria-hidden="true" />
                   <strong key={`${position}-${symbol}`}>{symbol}</strong>
                   {isSelected && <span className="needle">⌄</span>}
                   <span className="sprocket bottom" aria-hidden="true" />
