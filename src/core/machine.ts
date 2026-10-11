@@ -84,6 +84,11 @@ export function tapeText(tape: Record<number, TapeSymbol>): string {
     .join('')
 }
 
+export function octalTapeText(raw: string): string {
+  if (!raw) return ''
+  return raw.replace(/[01]+/g, (bits) => BigInt(`0b${bits}`).toString(8))
+}
+
 export function createInitialMachine(): MachineSnapshot {
   return { operation: 'add', tape: {}, head: 0, state: 'INPUT', step: 0, carry: 0, halted: false }
 }

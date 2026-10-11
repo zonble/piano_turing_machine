@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { applyPianoAction, createInitialMachine, formatTapeSymbol, pianoActions, runStep, tapeText, type MachineSnapshot, type MechanicalPhase, type PianoAction } from './core/machine'
+import { applyPianoAction, createInitialMachine, formatTapeSymbol, octalTapeText, pianoActions, runStep, tapeText, type MachineSnapshot, type MechanicalPhase, type PianoAction } from './core/machine'
 import { pianoFrequency, playBellChime, playFinalChord, playPunchStamp, playRatchetClick, playTone } from './core/audio'
 import './App.css'
 
@@ -94,6 +94,7 @@ function App() {
   })
 
   const rawTape = tapeText(machine.tape)
+  const octalTape = octalTapeText(rawTape)
   const activeGear = machine.gear
   const activePhase = activeGear?.phase
   const activePhaseIndex = activePhase ? mechanicalStages.findIndex((s) => s.id === activePhase) : -1
@@ -174,7 +175,14 @@ function App() {
             })}
           </div>
         </div>
-        <div className="tape-readout"><span>RAW <b>{rawTape || 'blank'}</b></span><span>HEAD <b>{machine.head}</b></span><span>STEP <b>{String(machine.step).padStart(3, '0')}</b></span></div>
+        <div className="tape-readout">
+          <div className="tape-readout-stack">
+            <span>RAW <b>{rawTape || 'blank'}</b></span>
+            <span>OCT <b>{octalTape || 'blank'}</b></span>
+          </div>
+          <span>HEAD <b>{machine.head}</b></span>
+          <span>STEP <b>{String(machine.step).padStart(3, '0')}</b></span>
+        </div>
       </section>
       <section className={`operation-module module ${gearWorking ? 'working' : ''}`}>
         <div className="module-heading"><span>ARITHMETIC GEAR (4-NOTCH RATCHET)</span><span>{gearPhaseLabel}</span></div>

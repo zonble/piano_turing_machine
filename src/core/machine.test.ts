@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyPianoAction, createInitialMachine, pianoActions, runStep, tapeText, type PianoAction } from './machine'
+import { applyPianoAction, createInitialMachine, octalTapeText, pianoActions, runStep, tapeText, type PianoAction } from './machine'
 
 const enterOnePlusOne = () => {
   let machine = createInitialMachine()
@@ -109,5 +109,11 @@ describe('piano-first machine', () => {
     expect(m.carry).toBe(0)
     expect(m.gear?.phase).toBe('STAMP_CARRY')
     expect(tapeText(m.tape)).toBe('1#1=10')
+  })
+
+  it('formats binary tape text into octal tape text (e.g. 101#1000=1101 -> 5#10=15)', () => {
+    expect(octalTapeText('101#1000=1101')).toBe('5#10=15')
+    expect(octalTapeText('1#1=10')).toBe('1#1=2')
+    expect(octalTapeText('')).toBe('')
   })
 })
