@@ -124,6 +124,10 @@ function App() {
             : `⑤ 進位栓釋放：往左退一格印出進位 1 → 棘輪歸零`
     : '輸入 A#B 時棘輪保持歸零 (0 格)；按下 ▶ 開始五動分解運算'
 
+  const currentStateSlot = stateRegister(machine.state)
+  const stateIndex = Math.max(0, stateNames.indexOf(currentStateSlot))
+  const stateStepDeg = 360 / stateNames.length
+
   return <main className="app-shell">
     <header className="masthead"><div className="brand-mark">PTM<i /></div><div><p className="eyebrow">A MECHANICAL COMPUTING INSTRUMENT</p><h1>Piano <em>Turing</em> Machine</h1></div><div className={`machine-status ${running ? 'live' : ''}`}><span />{running ? 'PLAYING' : machine.halted ? 'HALT' : 'READY'}</div></header>
 
@@ -147,7 +151,6 @@ function App() {
     </section>
 
     <section className="machine-board">
-      <section className="state-module module"><div className="module-heading"><span>STATE GEAR</span><span>CONTROL MEMORY</span></div><div className="state-wheel">{stateNames.map((state) => <div className={`state-slot ${stateRegister(machine.state) === state ? 'current' : ''}`} key={state}><i />{state}</div>)}</div><p className="module-note">目前狀態由狀態輪保存，不寫入 Tape。</p></section>
       <section className={`tape-module module ${machine.state === 'SCAN' ? 'scanning' : ''} ${bellRinging ? 'bell-flash' : ''}`}>
         <div className="module-heading"><span>TAPE + HEAD</span><span>{currentSymbol} AT {machine.head >= 0 ? '+' : ''}{machine.head}</span></div>
         <div className="tape-window">
@@ -184,6 +187,47 @@ function App() {
           <span>STEP <b>{String(machine.step).padStart(3, '0')}</b></span>
         </div>
       </section>
+
+      <section className={`state-module module ${gearWorking ? 'working' : ''}`}>
+        <div className="module-heading"><span>STATE GEAR</span><span>{currentStateSlot} · {machine.state}</span></div>
+        <div className="state-gear-bench">
+          <div className="state-gear-housing">
+            <div className="index-pawl" title="狀態輪定位棘爪">▼</div>
+            <div
+              className="state-gear-wheel"
+              style={{ transform: `rotate(${-stateIndex * stateStepDeg}deg)` }}
+              aria-label={`State gear wheel at ${currentStateSlot}`}
+            >
+              {stateNames.map((state, idx) => (
+                <span
+                  key={state}
+                  className={`state-tooth ${currentStateSlot === state ? 'active' : ''}`}
+                  style={{ transform: `rotate(${idx * stateStepDeg}deg) translateY(-38px)` }}
+                >
+                  <b style={{ transform: `rotate(${stateIndex * stateStepDeg - idx * stateStepDeg}deg)` }}>
+                    {state === 'HALT' ? 'HLT' : state}
+                  </b>
+                </span>
+              ))}
+              <div
+                className="wheel-hub"
+                style={{ transform: `rotate(${stateIndex * stateStepDeg}deg)` }}
+              >
+                <span>{currentStateSlot}</span>
+              </div>
+            </div>
+          </div>
+          <div className="state-wheel">
+            {stateNames.map((state) => (
+              <div className={`state-slot ${currentStateSlot === state ? 'current' : ''}`} key={state}>
+                <i />{state}
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="module-note">狀態輪隨每步推進旋轉，與右側加法棘輪連動。</p>
+      </section>
+
       <section className={`operation-module module ${gearWorking ? 'working' : ''}`}>
         <div className="module-heading"><span>ARITHMETIC GEAR (4-NOTCH RATCHET)</span><span>{gearPhaseLabel}</span></div>
         <div className="ratchet-bench" aria-label="1900s 4-notch mechanical adder mechanism">
