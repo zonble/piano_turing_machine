@@ -116,4 +116,30 @@ describe('piano-first machine', () => {
     expect(octalTapeText('1#1=10')).toBe('1#1=2')
     expect(octalTapeText('')).toBe('')
   })
+
+  it('can step manually with the step action directly from INPUT without pressing play first', () => {
+    let m = enterOnePlusOne()
+    expect(m.state).toBe('INPUT')
+
+    m = applyPianoAction(m, 'step') // Step 1: READ_A
+    expect(m.state).toBe('SCAN')
+    expect(m.gear?.phase).toBe('READ_A')
+
+    m = applyPianoAction(m, 'step') // Step 2: READ_B
+    expect(m.state).toBe('ADD')
+    expect(m.gear?.phase).toBe('READ_B')
+
+    m = applyPianoAction(m, 'step') // Step 3: BELL_EQ
+    expect(m.state).toBe('CARRY')
+    expect(m.gear?.phase).toBe('BELL_EQ')
+
+    m = applyPianoAction(m, 'step') // Step 4: STAMP_SUM
+    expect(m.state).toBe('WRITE')
+    expect(m.gear?.phase).toBe('STAMP_SUM')
+
+    m = applyPianoAction(m, 'step') // Step 5: STAMP_CARRY -> HALT
+    expect(m.state).toBe('HALT')
+    expect(m.halted).toBe(true)
+    expect(tapeText(m.tape)).toBe('1#1=10')
+  })
 })

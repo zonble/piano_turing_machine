@@ -59,8 +59,8 @@ function App() {
     } else {
       playTone(pianoFrequency(41 + keyIndex), .18, 'triangle')
     }
-    if (action === 'play' && next.state === 'SCAN') setRunning(true)
-    if (action === 'stop' || action === 'reset' || next.halted) setRunning(false)
+    if (action === 'play' && !next.halted && next.program) setRunning(true)
+    if (action === 'step' || action === 'stop' || action === 'reset' || next.halted) setRunning(false)
   }
 
   useEffect(() => {

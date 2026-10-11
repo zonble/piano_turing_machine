@@ -158,7 +158,10 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
     const nextHead = action === 'moveLeft' ? baseHead - 1 : action === 'moveRight' ? baseHead + 1 : baseHead
     return { ...snapshot, tape, head: nextHead, state: editingHaltedTape ? 'INPUT' : snapshot.state, halted: false, gear: editingHaltedTape ? undefined : snapshot.gear, result: editingHaltedTape ? undefined : snapshot.result, program: editingHaltedTape ? undefined : snapshot.program, error: undefined, lastEvent: { state: editingHaltedTape ? 'INPUT' : snapshot.state, message: editingHaltedTape ? `${pianoActionLabels[action]} Result Tape is editable.` : pianoActionLabels[action], action } }
   }
-  if (action === 'play') {
+  if (action === 'play' || action === 'step') {
+    if (snapshot.program) {
+      return action === 'step' ? runStep(snapshot) : snapshot
+    }
     const text = tapeText(snapshot.tape)
     const result = resultFor(text)
     const gear = computeGearForInput(text, 0)
@@ -193,7 +196,6 @@ export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction)
       },
     }
   }
-  if (action === 'step') return runStep(snapshot)
   return snapshot
 }
 
