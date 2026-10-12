@@ -194,6 +194,7 @@ function App() {
       return true
     }
   })
+  const [helpTab, setHelpTab] = useState<'manual' | 'history'>('manual')
   const cells = useMemo(() => tapePositions(machine.head), [machine.head])
 
   const closeHelp = () => {
@@ -685,8 +686,12 @@ function App() {
         >
           <div className="help-modal-header">
             <div>
-              <span className="eyebrow">CURATOR&apos;S NOTE &amp; OPERATOR&apos;S MANUAL</span>
-              <h2 id="help-modal-title">The 1900 Missing Link of Computing</h2>
+              <span className="eyebrow">CURATOR&apos;S NOTE &amp; ARCHIVAL CHRONICLE</span>
+              <h2 id="help-modal-title">
+                {helpTab === 'manual'
+                  ? 'The 1900 Missing Link of Computing'
+                  : '1900–1939: From Parlor Piano to Dieselpunk Codebreaker'}
+              </h2>
             </div>
             <button
               type="button"
@@ -698,153 +703,333 @@ function App() {
             </button>
           </div>
 
-          <div className="help-modal-body">
-            <section className="help-section">
-              <h3>1. The Concept: What If Turing Built His Machine in 1900?</h3>
-              <figure className="help-exhibit-figure">
-                <img
-                  src={`${import.meta.env.BASE_URL}concept-product.jpg`}
-                  alt="1900 Piano Turing Machine museum exhibit with bidirectional paper tape, 8-tooth state gear, and rotary gear turret"
-                />
-                <figcaption>
-                  <span>EXHIBIT RECONSTRUCTION · LONDON c. 1900</span>
-                  <span>Left: Bidirectional Paper Tape &amp; Tracker Bar · Center: 8-Tooth State Register · Right: Rotary Gear Turret, 4-Notch Ratchet &amp; Bell</span>
-                </figcaption>
-              </figure>
-              <p>
-                In computing history, there is a century-long conceptual gap between <b>19th-century mechanical calculators</b> (built from brass gears) and <b>Alan Turing&apos;s 1936 universal machine</b> (conceived as pure mathematical symbols on an infinite tape). Every physical component needed to build a Turing machine already existed in <b>1900</b>—inside a parlor player piano and a mechanical desk calculator:
-              </p>
-              <div className="help-era-grid">
-                <div className="era-card">
-                  <img
-                    className="era-thumb"
-                    src={`${import.meta.env.BASE_URL}era-babbage.jpg`}
-                    alt="Pascal and Babbage brass gear columns where each digit requires its own gear wheel"
-                  />
-                  <span className="era-year">1642 – 1830s</span>
-                  <strong>Pascal &amp; Babbage&apos;s Gear Calculators</strong>
-                  <p>
-                    Every digit required its own physical gear column. To add 40-digit numbers, you had to machine 40 interlocking brass wheels—bounded by hardware size.
-                  </p>
-                </div>
-                <div className="era-card">
-                  <img
-                    className="era-thumb"
-                    src={`${import.meta.env.BASE_URL}era-pianola.jpg`}
-                    alt="1900s Player Piano perforated paper roll gliding over a brass pneumatic tracker bar"
-                  />
-                  <span className="era-year">1900s</span>
-                  <strong>The Player Piano (Pianola)</strong>
-                  <p>
-                    Perforated paper rolls glided over a brass <b>Tracker Bar</b>. Whenever a punched hole passed an air port, suction tripped a pneumatic striker to play a piano key.
-                  </p>
-                </div>
-                <div className="era-card highlight">
-                  <img
-                    className="era-thumb"
-                    src={`${import.meta.env.BASE_URL}concept-product.jpg`}
-                    alt="1900 Piano Turing Machine combining a bidirectional paper tape, state gear, and 1-bit ratchet turret"
-                  />
-                  <span className="era-year">1936 → 1900</span>
-                  <strong>The Piano Turing Machine</strong>
-                  <p>
-                    Instead of 40 gear columns for 40 bits, a <b>single 1-bit ratchet wheel</b> rides back and forth across a <b>perforated paper tape</b>—computing numbers of <em>unlimited length</em>.
-                  </p>
-                </div>
-              </div>
-              <p className="help-hint">
-                <b>Why this matters:</b> Moving memory off the gears and onto a scrollable paper tape is the exact leap from a fixed calculator to a general-purpose computer. Swapping the cam wheel on the <b>9-Gear Rotary Turret</b> transforms the same 4-notch ratchet into an <b>ALU</b> capable of Addition, Subtraction, Multiplication, and Bitwise Logic.
-              </p>
-            </section>
-
-            <section className="help-section">
-              <h3>2. Quick Start: Computing 1 + 1 = 2 (Binary 10)</h3>
-              <p>
-                Punching a symbol writes onto the <b>current cell</b> without moving the tape head, so move right one cell between each symbol to write <code>1#1</code>:
-              </p>
-              <div className="help-recipe-steps">
-                <div className="recipe-step">
-                  <span className="step-badge">Step 1</span>
-                  <span className="step-action">Punch first number <code>1</code></span>
-                  <kbd>D</kbd>
-                  <small>Piano key: Mi (<code>1</code>)</small>
-                </div>
-                <div className="recipe-step">
-                  <span className="step-badge">Step 2</span>
-                  <span className="step-action">Move head to next cell</span>
-                  <kbd>S</kbd>
-                  <small>Piano key: Re (<code>→</code>)</small>
-                </div>
-                <div className="recipe-step">
-                  <span className="step-badge">Step 3</span>
-                  <span className="step-action">Punch operand separator <code>#</code></span>
-                  <kbd>H</kbd>
-                  <small>Piano key: La (<code>#</code>)</small>
-                </div>
-                <div className="recipe-step">
-                  <span className="step-badge">Step 4</span>
-                  <span className="step-action">Move head to next cell</span>
-                  <kbd>S</kbd>
-                  <small>Piano key: Re (<code>→</code>)</small>
-                </div>
-                <div className="recipe-step">
-                  <span className="step-badge">Step 5</span>
-                  <span className="step-action">Punch second number <code>1</code></span>
-                  <kbd>D</kbd>
-                  <small>Piano key: Mi (<code>1</code>)</small>
-                </div>
-                <div className="recipe-step run">
-                  <span className="step-badge">Step 6</span>
-                  <span className="step-action">Start the clockwork</span>
-                  <kbd>T</kbd>
-                  <small>F♯ (<code>▶ Play</code>) or <kbd>W</kbd> (<code>⏭ Step</code>)</small>
-                </div>
-              </div>
-              <p className="help-hint">
-                <b>Tip:</b> Multi-bit numbers work the same way — e.g. for <code>7 × 2 = 14</code>, rotate the turret to <b>MUL</b> (<kbd>J</kbd>) and punch <code>111#10</code>. For single-operand gears (<b>INC</b>, <b>SHL</b>, <b>NOT</b>), omit <code>#</code>.
-              </p>
-            </section>
-
-            <section className="help-section">
-              <h3>3. Single-Octave Piano Keyboard (C4–B4)</h3>
-              <div className="help-grid">
-                <div>
-                  <strong>White Keys (Tape &amp; Turret)</strong>
-                  <ul>
-                    <li><b>Do (A) / Re (S)</b>: Move tape head Left <code>←</code> / Right <code>→</code></li>
-                    <li><b>Mi (D) / Fa (F)</b>: Punch <code>1</code> (open hole) / <code>0</code> (solid mark)</li>
-                    <li><b>So (G) / La (H)</b>: Clear cell <code>□</code> / Punch separator <code>#</code></li>
-                    <li><b>Si (J)</b>: Rotate Gear Turret forward <code>⚙▶</code></li>
-                  </ul>
-                </div>
-                <div>
-                  <strong>Black Keys (Transport &amp; Turret)</strong>
-                  <ul>
-                    <li><b>C♯ (W)</b>: <code>⏭ Step</code> — advance 1 mechanical stage</li>
-                    <li><b>D♯ (E)</b>: <code>↺ Reset</code> — reset head (or clear finished result)</li>
-                    <li><b>F♯ (T)</b>: <code>▶ Play</code> — auto-step through the tape</li>
-                    <li><b>G♯ (Y)</b>: <code>⏸ Pause</code> — pause at current stage</li>
-                    <li><b>A♯ (U)</b>: <code>◀⚙</code> — rotate Gear Turret backward</li>
-                  </ul>
-                </div>
-              </div>
-            </section>
-
-            <section className="help-section">
-              <h3>4. How the Three Mechanical Assemblies Work Together</h3>
-              <ol className="help-steps">
-                <li>
-                  <b>Paper Tape &amp; Pneumatic Tracker Bar (Left)</b>: Acts as both infinite memory and I/O. In stages <b>① q1</b> and <b>② q2</b>, the brass feeler pin drops into open holes (<code>1</code>), admitting air to stroke the driving pawl <code>+1 tooth</code>.
-                </li>
-                <li>
-                  <b>8-Tooth State Spur Gear (Center)</b>: The machine&apos;s finite state register (<code>INPUT → SCAN → q1 → q2 → q3 → q4 → WRITE → HALT</code>), coordinating when the tape shuttles left or right.
-                </li>
-                <li>
-                  <b>Rotary Gear Turret &amp; 4-Notch Ratchet (Right)</b>: Accumulates <code>A + B + Carry (0..3)</code> on a single 4-tooth wheel. In <b>③ q3</b>, raised cam lobes (<code>LOBE 1</code> vs <code>VALLEY 0</code>) fire the punch hammer; in <b>④ q4</b>, reaching Notch <code>≥ 2</code> locks the <b>Carry Latch</b> for the next bit to the left.
-                </li>
-              </ol>
-            </section>
+          <div className="help-tabs" role="tablist" aria-label="Manual sections">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={helpTab === 'manual'}
+              className={`help-tab ${helpTab === 'manual' ? 'active' : ''}`}
+              onClick={() => setHelpTab('manual')}
+            >
+              01 · OPERATOR&apos;S MANUAL
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={helpTab === 'history'}
+              className={`help-tab ${helpTab === 'history' ? 'active' : ''}`}
+              onClick={() => setHelpTab('history')}
+            >
+              02 · 1900–1939 ALTERNATE HISTORY
+            </button>
           </div>
+
+          {helpTab === 'manual' ? (
+            <div className="help-modal-body">
+              <section className="help-section">
+                <h3>1. The Concept: What If Turing Built His Machine in 1900?</h3>
+                <figure className="help-exhibit-figure">
+                  <img
+                    src={`${import.meta.env.BASE_URL}concept-product.jpg`}
+                    alt="1900 Piano Turing Machine museum exhibit with bidirectional paper tape, 8-tooth state gear, and rotary gear turret"
+                  />
+                  <figcaption>
+                    <span>EXHIBIT RECONSTRUCTION · LONDON c. 1900</span>
+                    <span>Left: Bidirectional Paper Tape &amp; Tracker Bar · Center: 8-Tooth State Register · Right: Rotary Gear Turret, 4-Notch Ratchet &amp; Bell</span>
+                  </figcaption>
+                </figure>
+                <p>
+                  In computing history, there is a century-long conceptual gap between <b>19th-century mechanical calculators</b> (built from brass gears) and <b>Alan Turing&apos;s 1936 universal machine</b> (conceived as pure mathematical symbols on an infinite tape). Every physical component needed to build a Turing machine already existed in <b>1900</b>—inside a parlor player piano and a mechanical desk calculator:
+                </p>
+                <div className="help-era-grid">
+                  <div className="era-card">
+                    <img
+                      className="era-thumb"
+                      src={`${import.meta.env.BASE_URL}era-babbage.jpg`}
+                      alt="Pascal and Babbage brass gear columns where each digit requires its own gear wheel"
+                    />
+                    <span className="era-year">1642 – 1830s</span>
+                    <strong>Pascal &amp; Babbage&apos;s Gear Calculators</strong>
+                    <p>
+                      Every digit required its own physical gear column. To add 40-digit numbers, you had to machine 40 interlocking brass wheels—bounded by hardware size.
+                    </p>
+                  </div>
+                  <div className="era-card">
+                    <img
+                      className="era-thumb"
+                      src={`${import.meta.env.BASE_URL}era-pianola.jpg`}
+                      alt="1900s Player Piano perforated paper roll gliding over a brass pneumatic tracker bar"
+                    />
+                    <span className="era-year">1900s</span>
+                    <strong>The Player Piano (Pianola)</strong>
+                    <p>
+                      Perforated paper rolls glided over a brass <b>Tracker Bar</b>. Whenever a punched hole passed an air port, suction tripped a pneumatic striker to play a piano key.
+                    </p>
+                  </div>
+                  <div className="era-card highlight">
+                    <img
+                      className="era-thumb"
+                      src={`${import.meta.env.BASE_URL}concept-product.jpg`}
+                      alt="1900 Piano Turing Machine combining a bidirectional paper tape, state gear, and 1-bit ratchet turret"
+                    />
+                    <span className="era-year">1936 → 1900</span>
+                    <strong>The Piano Turing Machine</strong>
+                    <p>
+                      Instead of 40 gear columns for 40 bits, a <b>single 1-bit ratchet wheel</b> rides back and forth across a <b>perforated paper tape</b>—computing numbers of <em>unlimited length</em>.
+                    </p>
+                  </div>
+                </div>
+                <p className="help-hint">
+                  <b>Why this matters:</b> Moving memory off the gears and onto a scrollable paper tape is the exact leap from a fixed calculator to a general-purpose computer. Swapping the cam wheel on the <b>9-Gear Rotary Turret</b> transforms the same 4-notch ratchet into an <b>ALU</b> capable of Addition, Subtraction, Multiplication, and Bitwise Logic.
+                </p>
+              </section>
+
+              <section className="help-section">
+                <h3>2. Quick Start: Computing 1 + 1 = 2 (Binary 10)</h3>
+                <p>
+                  Punching a symbol writes onto the <b>current cell</b> without moving the tape head, so move right one cell between each symbol to write <code>1#1</code>:
+                </p>
+                <div className="help-recipe-steps">
+                  <div className="recipe-step">
+                    <span className="step-badge">Step 1</span>
+                    <span className="step-action">Punch first number <code>1</code></span>
+                    <kbd>D</kbd>
+                    <small>Piano key: Mi (<code>1</code>)</small>
+                  </div>
+                  <div className="recipe-step">
+                    <span className="step-badge">Step 2</span>
+                    <span className="step-action">Move head to next cell</span>
+                    <kbd>S</kbd>
+                    <small>Piano key: Re (<code>→</code>)</small>
+                  </div>
+                  <div className="recipe-step">
+                    <span className="step-badge">Step 3</span>
+                    <span className="step-action">Punch operand separator <code>#</code></span>
+                    <kbd>H</kbd>
+                    <small>Piano key: La (<code>#</code>)</small>
+                  </div>
+                  <div className="recipe-step">
+                    <span className="step-badge">Step 4</span>
+                    <span className="step-action">Move head to next cell</span>
+                    <kbd>S</kbd>
+                    <small>Piano key: Re (<code>→</code>)</small>
+                  </div>
+                  <div className="recipe-step">
+                    <span className="step-badge">Step 5</span>
+                    <span className="step-action">Punch second number <code>1</code></span>
+                    <kbd>D</kbd>
+                    <small>Piano key: Mi (<code>1</code>)</small>
+                  </div>
+                  <div className="recipe-step run">
+                    <span className="step-badge">Step 6</span>
+                    <span className="step-action">Start the clockwork</span>
+                    <kbd>T</kbd>
+                    <small>F♯ (<code>▶ Play</code>) or <kbd>W</kbd> (<code>⏭ Step</code>)</small>
+                  </div>
+                </div>
+                <p className="help-hint">
+                  <b>Tip:</b> Multi-bit numbers work the same way — e.g. for <code>7 × 2 = 14</code>, rotate the turret to <b>MUL</b> (<kbd>J</kbd>) and punch <code>111#10</code>. For single-operand gears (<b>INC</b>, <b>SHL</b>, <b>NOT</b>), omit <code>#</code>.
+                </p>
+              </section>
+
+              <section className="help-section">
+                <h3>3. Single-Octave Piano Keyboard (C4–B4)</h3>
+                <div className="help-grid">
+                  <div>
+                    <strong>White Keys (Tape &amp; Turret)</strong>
+                    <ul>
+                      <li><b>Do (A) / Re (S)</b>: Move tape head Left <code>←</code> / Right <code>→</code></li>
+                      <li><b>Mi (D) / Fa (F)</b>: Punch <code>1</code> (open hole) / <code>0</code> (solid mark)</li>
+                      <li><b>So (G) / La (H)</b>: Clear cell <code>□</code> / Punch separator <code>#</code></li>
+                      <li><b>Si (J)</b>: Rotate Gear Turret forward <code>⚙▶</code></li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong>Black Keys (Transport &amp; Turret)</strong>
+                    <ul>
+                      <li><b>C♯ (W)</b>: <code>⏭ Step</code> — advance 1 mechanical stage</li>
+                      <li><b>D♯ (E)</b>: <code>↺ Reset</code> — reset head (or clear finished result)</li>
+                      <li><b>F♯ (T)</b>: <code>▶ Play</code> — auto-step through the tape</li>
+                      <li><b>G♯ (Y)</b>: <code>⏸ Pause</code> — pause at current stage</li>
+                      <li><b>A♯ (U)</b>: <code>◀⚙</code> — rotate Gear Turret backward</li>
+                    </ul>
+                  </div>
+                </div>
+              </section>
+
+              <section className="help-section">
+                <h3>4. How the Three Mechanical Assemblies Work Together</h3>
+                <ol className="help-steps">
+                  <li>
+                    <b>Paper Tape &amp; Pneumatic Tracker Bar (Left)</b>: Acts as both infinite memory and I/O. In stages <b>① q1</b> and <b>② q2</b>, the brass feeler pin drops into open holes (<code>1</code>), admitting air to stroke the driving pawl <code>+1 tooth</code>.
+                  </li>
+                  <li>
+                    <b>8-Tooth State Spur Gear (Center)</b>: The machine&apos;s finite state register (<code>INPUT → SCAN → q1 → q2 → q3 → q4 → WRITE → HALT</code>), coordinating when the tape shuttles left or right.
+                  </li>
+                  <li>
+                    <b>Rotary Gear Turret &amp; 4-Notch Ratchet (Right)</b>: Accumulates <code>A + B + Carry (0..3)</code> on a single 4-tooth wheel. In <b>③ q3</b>, raised cam lobes (<code>LOBE 1</code> vs <code>VALLEY 0</code>) fire the punch hammer; in <b>④ q4</b>, reaching Notch <code>≥ 2</code> locks the <b>Carry Latch</b> for the next bit to the left.
+                  </li>
+                </ol>
+              </section>
+            </div>
+          ) : (
+            <div className="help-modal-body">
+              <section className="help-section">
+                <h3>1. Camshaft Phase Angle &amp; Geneva Intermittent Drive (No Quartz Clock Needed!)</h3>
+                <p>
+                  Unlike electronic computers—which need a quartz oscillator because voltages race through transistors without physical linkages—a pure mechanical Turing machine does <b>not</b> need a time clock to sequence its steps. Everything is locked to the <b>360° rotation angle of a single Main Camshaft</b> paired with a <b>Geneva Intermittent Wheel</b> (the stop-and-go gear from 1890s film projectors):
+                </p>
+                <p className="help-hint">
+                  <b>0°–90°:</b> Feeler pin drops into the stationary paper tape · <b>90°–180°:</b> Pawl advances the 4-notch ratchet or fires the punch hammer · <b>180°–270°:</b> Pin retracts clear of the paper (so it never tears the tape!) · <b>270°–360°:</b> The Geneva wheel steps the paper tape 1 cell left or right. Governors (fly-fans, pendulums, or Watt flyballs) are only added to prevent wound springs from unwinding all at once and to keep a musical <b>Tempo (BPM)</b>!
+                </p>
+              </section>
+
+              <section className="help-section">
+                <h3>2. Seven Generations of Mechanical Turing Machines (1900–1939)</h3>
+                <div className="lore-grid">
+                  <div className="lore-card current-gen">
+                    <img
+                      className="lore-thumb"
+                      src={`${import.meta.env.BASE_URL}concept-product.jpg`}
+                      alt="Gen I 1900 London Museum Tabletop Piano Turing Machine"
+                    />
+                    <div className="lore-head">
+                      <span className="era-year">GEN I · 1900 LONDON</span>
+                      <strong>Museum &amp; Study Tabletop Prototype</strong>
+                    </div>
+                    <p>
+                      The machine simulated in this exhibit. Combines a 12-key single-octave piano console, bidirectional buff paper roll, 8-tooth state spur gear, and a 9-gear rotary turret driving a 4-notch ratchet wheel.
+                    </p>
+                    <div className="lore-meta">
+                      <span><b>Power:</b> Pneumatic + Spring</span>
+                      <span><b>Drive:</b> Geneva Camshaft</span>
+                      <span><b>Tape:</b> Paper Roll</span>
+                    </div>
+                  </div>
+
+                  <div className="lore-card">
+                    <img
+                      className="lore-thumb"
+                      src={`${import.meta.env.BASE_URL}gen2-pianola.jpg`}
+                      alt="Gen II 1901 Victorian Upright Pianola Conversion"
+                    />
+                    <div className="lore-head">
+                      <span className="era-year">GEN II · 1901 PARLOR EDITION</span>
+                      <strong>Victorian Upright Pianola Conversion</strong>
+                    </div>
+                    <p>
+                      Powered by <b>dual foot-treadle exhaust bellows</b> and a 4-crank pneumatic wind motor. Allowed any household upright player piano to read, punch, and compute on standard music rolls.
+                    </p>
+                    <div className="lore-meta">
+                      <span><b>Power:</b> Foot Treadles</span>
+                      <span><b>Tempo:</b> Air Throttle</span>
+                      <span><b>Audio:</b> Piano Strings</span>
+                    </div>
+                  </div>
+
+                  <div className="lore-card">
+                    <img
+                      className="lore-thumb"
+                      src={`${import.meta.env.BASE_URL}gen3-grandfather.jpg`}
+                      alt="Gen III 1903 Observatory Grandfather-Clock Dual-Weight Turing Engine"
+                    />
+                    <div className="lore-head">
+                      <span className="era-year">GEN III · 1903 OBSERVATORY</span>
+                      <strong>Grandfather-Clock Dual-Weight Engine</strong>
+                    </div>
+                    <p>
+                      Built for clearing banks and observatories. A 1-meter brass pendulum regulates the <em>Going Train</em>, lightly tripping a 1-gram release detent so a second <b>5 kg Striking Weight</b> (49 J) slams the hole punch without stalling the swing.
+                    </p>
+                    <div className="lore-meta">
+                      <span><b>Power:</b> Twin 5 kg Weights</span>
+                      <span><b>Governor:</b> 1 m Pendulum</span>
+                      <span><b>Audio:</b> Tubular Bells</span>
+                    </div>
+                  </div>
+
+                  <div className="lore-card">
+                    <img
+                      className="lore-thumb"
+                      src={`${import.meta.env.BASE_URL}gen4-steam.jpg`}
+                      alt="Gen IV 1905 Royal Society Live-Steam and Flywheel Laboratory Engine"
+                    />
+                    <div className="lore-head">
+                      <span className="era-year">GEN IV · 1905 ROYAL SOCIETY</span>
+                      <strong>Live-Steam &amp; Flywheel Laboratory Engine</strong>
+                    </div>
+                    <p>
+                      Driven by a riveted copper steam boiler and spoked cast-iron flywheel. Uses a <b>Single-Revolution Clutch</b> during human typing (<code>INPUT</code>) and a <b>Main Dog Clutch</b> on <code>F♯ (▶ Play)</code> that auto-kicks to neutral at <code>HALT</code> with a blast of a brass steam whistle.
+                    </p>
+                    <div className="lore-meta">
+                      <span><b>Power:</b> Steam Flywheel</span>
+                      <span><b>Governor:</b> Watt Flyballs</span>
+                      <span><b>Audio:</b> Steam Whistle</span>
+                    </div>
+                  </div>
+
+                  <div className="lore-card">
+                    <img
+                      className="lore-thumb"
+                      src={`${import.meta.env.BASE_URL}gen5-glassdome.jpg`}
+                      alt="Gen V 1908 Geneva Glass-Dome Grande Complication Desk Engine"
+                    />
+                    <div className="lore-head">
+                      <span className="era-year">GEN V · 1908 GENEVA</span>
+                      <strong>Glass-Dome <em>Grande Complication</em> Desk Engine</strong>
+                    </div>
+                    <p>
+                      Miniaturized by Swiss master watchmakers under a crystal cloche. Twin blued-steel mainspring barrels and a silent music-box fly-fan governor drive miniature brass cams and a tuned steel comb.
+                    </p>
+                    <div className="lore-meta">
+                      <span><b>Power:</b> Twin Mainsprings</span>
+                      <span><b>Governor:</b> Fly-Fan Vane</span>
+                      <span><b>Audio:</b> Music Comb</span>
+                    </div>
+                  </div>
+
+                  <div className="lore-card">
+                    <img
+                      className="lore-thumb"
+                      src={`${import.meta.env.BASE_URL}gen6-aviator.jpg`}
+                      alt="Gen VI 1910 Aviator's Kneeboard Flip-Pin Chronometer"
+                    />
+                    <div className="lore-head">
+                      <span className="era-year">GEN VI · 1910 AVIATION</span>
+                      <strong>Aviator&apos;s Kneeboard Chronometer</strong>
+                    </div>
+                    <p>
+                      Strapped to the leather flight trousers of airship and biplane navigators. A <b>Blued-Steel Fusee Chain with Gold Bi-Stable Sliding Pins</b> replaces paper confetti forever, while high/low <b>Minute-Repeater Gongs</b> let pilots hear answers in the dark without looking down.
+                    </p>
+                    <div className="lore-meta">
+                      <span><b>Drive:</b> Spring Camshaft</span>
+                      <span><b>RAM:</b> Gold Flip-Pin Chain</span>
+                      <span><b>Audio:</b> Repeater Gongs</span>
+                    </div>
+                  </div>
+
+                  <div className="lore-card highlight lore-wide">
+                    <img
+                      className="lore-thumb lore-thumb-wide"
+                      src={`${import.meta.env.BASE_URL}gen7-diesel.jpg`}
+                      alt="Gen VII 1939 Bletchley Park 64-Core Submarine-Diesel Cryptanalytic Array"
+                    />
+                    <div className="lore-head">
+                      <span className="era-year">GEN VII · 1939 BLETCHLEY PARK &amp; ROYAL NAVY</span>
+                      <strong>64-Core Submarine-Diesel Cryptanalytic Array (The Anti-Enigma Engine)</strong>
+                    </div>
+                    <p>
+                      Because the 9-gear turret includes an <b>XOR (A ^ B)</b> cam, the machine doubled as a <b>Vernam One-Time Pad</b> cipher engine as early as 1900. When Axis forces deployed odometer-style <em>Enigma</em> rotors in 1939, British cryptanalysts coupled a <b>6-cylinder submarine Diesel engine</b> via overhead line shafts to <b>64 parallel Turing turrets</b> running 35 mm perforated celluloid film loops at 2,000 RPM—cracking rotor keys before breakfast until a matching unit&apos;s <code>HALT</code> clutch kicked out and rang its ship&apos;s bell.
+                    </p>
+                    <div className="lore-meta">
+                      <span><b>Power:</b> 6-Cylinder Submarine Diesel + Line Shaft</span>
+                      <span><b>Tape:</b> 35 mm Celluloid Film &amp; Steel Loops</span>
+                      <span><b>ALU:</b> 64 Parallel XOR / ADD Turrets</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
         </div>
       </div>
     )}

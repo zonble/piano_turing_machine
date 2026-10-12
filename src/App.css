@@ -149,6 +149,10 @@ button { cursor: pointer; }
 .help-modal-header h2 { margin: 0; font: 500 22px 'Playfair Display', serif; color: var(--cream); }
 .help-close { width: 32px; height: 32px; border: 1px solid var(--line); background: rgba(0, 0, 0, .25); color: var(--muted); font-size: 14px; display: grid; place-items: center; transition: border-color .2s, color .2s, background .2s; }
 .help-close:hover { border-color: var(--orange); color: var(--orange); background: rgba(228, 119, 69, .14); }
+.help-tabs { display: flex; border-bottom: 1px solid var(--line); background: rgba(0, 0, 0, .28); padding: 0 22px; gap: 6px; }
+.help-tab { padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: 600 10px 'IBM Plex Mono', monospace; letter-spacing: .1em; transition: color .2s, border-color .2s, background .2s; }
+.help-tab:hover { color: var(--cream); }
+.help-tab.active { color: var(--orange); border-bottom-color: var(--orange); background: rgba(228, 119, 69, .1); }
 .help-modal-body { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 18px; }
 .help-section h3 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; color: var(--orange); }
 .help-section p { margin: 0; font-size: 12.5px; line-height: 1.65; color: var(--ink); }
@@ -165,6 +169,19 @@ button { cursor: pointer; }
 .era-card.highlight .era-year { color: var(--orange); }
 .era-card strong { font-size: 11.5px; color: var(--cream); line-height: 1.35; }
 .era-card p { font-size: 11px; line-height: 1.5; color: var(--muted); }
+.lore-grid { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.lore-card { padding: 11px 13px; border: 1px solid var(--line); background: rgba(0, 0, 0, .22); display: flex; flex-direction: column; justify-content: space-between; gap: 7px; overflow: hidden; }
+.lore-card.current-gen { border-color: var(--brass); background: rgba(201, 167, 115, .1); }
+.lore-card.highlight { border-color: var(--orange); background: rgba(228, 119, 69, .12); }
+.lore-card.lore-wide { grid-column: 1 / -1; }
+.lore-thumb { display: block; width: calc(100% + 26px); height: 158px; margin: -11px -13px 4px; object-fit: cover; border-bottom: 1px solid var(--line); }
+.lore-thumb-wide { height: 220px; }
+.lore-card.highlight .era-year { color: var(--orange); }
+.lore-head { display: flex; flex-direction: column; gap: 2px; }
+.lore-head strong { font-size: 12px; color: var(--cream); line-height: 1.35; }
+.lore-card p { font-size: 11px; line-height: 1.52; color: var(--muted); }
+.lore-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; padding-top: 6px; border-top: 1px dashed rgba(238, 230, 213, .14); font-size: 9.5px; color: var(--muted); }
+.lore-meta b { color: var(--cream); }
 .help-recipe-steps { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .recipe-step { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 8px; padding: 7px 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, .22); }
 .recipe-step.run { border-color: var(--orange); background: rgba(228, 119, 69, .14); }
@@ -183,4 +200,4 @@ button { cursor: pointer; }
 .help-steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.55; color: var(--ink); }
 .help-steps b { color: var(--cream); }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-@media (max-width: 700px) { .app-shell { padding: 18px 14px; overflow: visible; }.masthead h1 { font-size: 20px; }.stage-strip { grid-template-columns: 1fr 1fr; }.machine-board { display: flex; flex-direction: column; }.state-module { order: 1; }.tape-module { order: 2; }.operation-module { order: 3; }.piano-module { margin-top: 16px; }.keybed { height: 136px; }.piano-guide { gap: 8px 14px; font-size: 9px; }.run-status { align-items: flex-start; flex-direction: column; }.help-grid, .help-era-grid, .help-recipe-steps { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .app-shell { padding: 18px 14px; overflow: visible; }.masthead h1 { font-size: 20px; }.stage-strip { grid-template-columns: 1fr 1fr; }.machine-board { display: flex; flex-direction: column; }.state-module { order: 1; }.tape-module { order: 2; }.operation-module { order: 3; }.piano-module { margin-top: 16px; }.keybed { height: 136px; }.piano-guide { gap: 8px 14px; font-size: 9px; }.run-status { align-items: flex-start; flex-direction: column; }.help-grid, .help-era-grid, .help-recipe-steps, .lore-grid { grid-template-columns: 1fr; } }

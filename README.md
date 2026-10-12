@@ -92,7 +92,42 @@ Punching a symbol writes onto the **current cell** without advancing the tape he
 
 ---
 
-## 5. Development
+## 5. Alternate-History Lore (1900–1939): Seven Generations of Mechanical Turing Machines
+
+### Why Mechanical Gears Don't Need a Quartz Clock: Camshaft Phase Angle & Geneva Drive
+
+Unlike electronic computers—which require a quartz oscillator (`Clock`) because electrical signals race through transistors without physical linkages—a pure mechanical gear computer sequences its operations by **Camshaft Phase Angle ($\theta = 0^\circ \to 360^\circ$)** paired with a **Geneva Intermittent Wheel** (the stop-and-go mechanism from 1890s film projectors):
+
+- **$0^\circ\text{–}90^\circ$ (Probe)**: The feeler pin drops into the **stationary** paper tape to sense `1` (hole) or `0` (solid).
+- **$90^\circ\text{–}180^\circ$ (Actuate / Punch)**: The driving pawl advances the 4-notch ratchet (`q1`/`q2`) or the cam follower fires the punch hammer (`q3`).
+- **$180^\circ\text{–}270^\circ$ (Retract)**: The feeler pin and punch needle retract completely clear of the paper (so the pin never rips the tape!).
+- **$270^\circ\text{–}360^\circ$ (Step Tape & State)**: The **Geneva wheel** engages for a quarter-turn, stepping the paper tape 1 cell Left or Right while advancing the 8-tooth State Gear.
+
+Because every sub-step is physically locked to shaft angle, the machine computes accurately whether hand-cranked at 1 RPM or driven by a diesel engine at 2,000 RPM. **Governors** (fly-fans, pendulums, or Watt flyballs) are only added to keep wound springs or falling weights from unwinding all at once—and to play the piano notes at a steady musical **Tempo (BPM)**!
+
+### The 1900–1939 Mechanical Lineage
+
+| Gen | Year & Model | Power Source | Sequencing & Tempo Governor | Memory Medium (Tape) | Acoustic Readout | Historical Role |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **I** | **1900 · Museum & Study Tabletop Prototype**<br/>*(Simulated in this web app)* | Pneumatic vacuum + clockwork spring clutch | Main camshaft + Geneva drive + air throttle | Bidirectional buff paper roll (`1`, `0`, `#`, `=`) | 12-key acoustic piano action + typewriter carriage bell | Built in London to prove a single 4-tooth ratchet can compute numbers of arbitrary length |
+| **II** | **1901 · Victorian Parlor Upright Pianola**<br/>*(Domestic Edition)* | **Dual foot-treadle exhaust bellows** | 4-crank pneumatic wind motor + tempo slide | Standard wide player-piano music roll | Full upright piano strings + striker pneumatics | Affordable household conversion kit for existing parlor *Pianolas* |
+| **III** | **1903 · Observatory Grandfather-Clock Engine**<br/>*(Dual-Train Weight Edition)* | **Twin 5 kg falling brass weights** (*Going Train* + *Striking Train*) | **1-meter brass pendulum** (prevents weight runaway & sets 60 BPM tempo) | 15 mm perforated telegraph tape | Tubular cathedral bells + tuned steel reeds | Used by observatories and clearing banks; the going train lightly trips a 1-gram release catch so the second 5 kg weight ($49\text{ J}$) slams the hole punch ($0.004\text{ J}$) |
+| **IV** | **1905 · Royal Society Steam-Flywheel Lab Engine**<br/>*(High-Speed Batch Edition)* | **Riveted copper steam boiler** (or Stirling hot-air lamp) + spoked cast-iron flywheel | **Watt centrifugal flyball governor** | Heavy oiled manila punch tape | Piano tone bars + **brass steam whistle on `HALT`** | Solved the human-vs-engine speed gap with a **Single-Revolution Clutch** during `INPUT` and a **Main Dog Clutch** engaged by `F♯ (▶ Play)` that auto-kicks into neutral at `HALT` |
+| **V** | **1908 · Geneva Glass-Dome *Grande Complication***<br/>*(Haute Horlogerie Desk Edition)* | Hand-wound **twin blued-steel mainspring barrels** | Music-box **centrifugal fly-fan governor** + constant-force *Remontoir* | 9 mm telegraph ribbon or miniature pin-chain | Swiss music-box steel comb + repeater gongs | Commissioned by European financiers; fits under a crystal cloche on a study desk |
+| **VI** | **1910 · Aviator's Kneeboard Chronometer**<br/>*(Early Aviation Edition)* | Freeze-resistant twin mainspring barrels | Spring camshaft + multi-axis balance governor | **Blued-steel Fusee Chain with Gold Bi-Stable Sliding Pins** | **Minute-Repeater high/low gongs** for blind night-flight readout | Strapped to the leather flight trousers of airship & biplane navigators; replaces paper with a reusable chad-free flip-pin chain and 12 glove-sized keys for eyes-free dead reckoning in the dark |
+| **VII** | **1939 · Bletchley Park 64-Core Diesel Array**<br/>*(Dieselpunk Anti-Enigma Engine)* | **6-cylinder submarine Diesel engine** + overhead steel line shaft | Direct belt drive at **2,000 RPM** + auto-kickout `HALT` dog clutches | **35 mm perforated celluloid film** & stainless-steel loops | 64 brass ship's bells (rings when a key match halts) | Because the turret's **`XOR` (`A ^ B`)** gear natively implements a **Vernam One-Time Pad**, British cryptanalysts ganged 64 high-speed turrets to a submarine diesel engine—crushing odometer-style *Enigma* ciphers on day one of WWII |
+
+| Gen II · 1901 Upright Pianola Conversion | Gen III · 1903 Grandfather-Clock Engine | Gen IV · 1905 Steam & Flywheel Lab Engine |
+| :---: | :---: | :---: |
+| <img src="docs/gen2-pianola.jpg" alt="Gen II 1901 Victorian Upright Pianola Conversion" width="280" /> | <img src="docs/gen3-grandfather.jpg" alt="Gen III 1903 Grandfather Clock Turing Engine" width="280" /> | <img src="docs/gen4-steam.jpg" alt="Gen IV 1905 Steam Flywheel Turing Engine" width="280" /> |
+
+| Gen V · 1908 Geneva Glass-Dome Automaton | Gen VI · 1910 Aviator's Kneeboard Chronometer | Gen VII · 1939 Bletchley Park 64-Core Diesel Array |
+| :---: | :---: | :---: |
+| <img src="docs/gen5-glassdome.jpg" alt="Gen V 1908 Geneva Glass-Dome Turing Automaton" width="280" /> | <img src="docs/gen6-aviator.jpg" alt="Gen VI 1910 Aviator Kneeboard Chronometer" width="280" /> | <img src="docs/gen7-diesel.jpg" alt="Gen VII 1939 Bletchley Park Diesel Array" width="280" /> |
+
+---
+
+## 6. Development
 
 ```bash
 npm install
@@ -100,4 +135,5 @@ npm run dev      # Start Vite dev server
 npm test         # Run Vitest unit tests
 npm run build    # Type-check and build production bundle
 ```
+
 
