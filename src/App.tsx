@@ -703,7 +703,7 @@ function App() {
               <h3>1. The Concept: What If Turing Built His Machine in 1900?</h3>
               <figure className="help-exhibit-figure">
                 <img
-                  src="/concept-product.jpg"
+                  src={`${import.meta.env.BASE_URL}concept-product.jpg`}
                   alt="1900 Piano Turing Machine museum exhibit with bidirectional paper tape, 8-tooth state gear, and rotary gear turret"
                 />
                 <figcaption>
@@ -718,7 +718,7 @@ function App() {
                 <div className="era-card">
                   <img
                     className="era-thumb"
-                    src="/era-babbage.jpg"
+                    src={`${import.meta.env.BASE_URL}era-babbage.jpg`}
                     alt="Pascal and Babbage brass gear columns where each digit requires its own gear wheel"
                   />
                   <span className="era-year">1642 – 1830s</span>
@@ -730,7 +730,7 @@ function App() {
                 <div className="era-card">
                   <img
                     className="era-thumb"
-                    src="/era-pianola.jpg"
+                    src={`${import.meta.env.BASE_URL}era-pianola.jpg`}
                     alt="1900s Player Piano perforated paper roll gliding over a brass pneumatic tracker bar"
                   />
                   <span className="era-year">1900s</span>
@@ -742,7 +742,7 @@ function App() {
                 <div className="era-card highlight">
                   <img
                     className="era-thumb"
-                    src="/concept-product.jpg"
+                    src={`${import.meta.env.BASE_URL}concept-product.jpg`}
                     alt="1900 Piano Turing Machine combining a bidirectional paper tape, state gear, and 1-bit ratchet turret"
                   />
                   <span className="era-year">1936 → 1900</span>
