@@ -2,10 +2,10 @@ import { parseOperationInput } from './operations'
 
 export type TapeSymbol = '0' | '1' | 'separator' | 'equals'
 export type StateId = 'INPUT' | 'SCAN' | 'ADD' | 'CARRY' | 'WRITE' | 'HALT' | 'q0' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5'
-export type PianoAction = 'setState0' | 'setState1' | 'setState2' | 'setState3' | 'setState4' | 'setState5' | 'write0' | 'write1' | 'writeSeparator' | 'blank' | 'moveLeft' | 'moveRight' | 'step' | 'play' | 'stop' | 'reset'
+export type PianoAction = 'write0' | 'write1' | 'writeSeparator' | 'blank' | 'moveLeft' | 'moveRight' | 'step' | 'play' | 'stop' | 'reset'
 export type MachineResult = { binary: string; decimal: number; octal: string }
 export type MachineEvent = { state: StateId; message: string; action?: PianoAction }
-export type MechanicalPhase = 'READ_A' | 'READ_B' | 'BELL_EQ' | 'STAMP_SUM' | 'STAMP_CARRY'
+export type MechanicalPhase = 'READ_A' | 'READ_B' | 'STAMP_SUM' | 'STAMP_CARRY'
 export type GearState = {
   aBit: 0 | 1
   bBit: 0 | 1
@@ -18,7 +18,6 @@ export type GearState = {
   bitIndex?: number
   totalBits?: number
   phase?: MechanicalPhase
-  bellRung?: boolean
   punching?: boolean
 }
 
@@ -49,41 +48,29 @@ export type MachineSnapshot = {
 }
 
 export const pianoActions: Record<string, PianoAction> = {
-  z: 'setState0',
-  x: 'setState1',
-  c: 'setState2',
-  v: 'setState3',
-  b: 'setState4',
-  n: 'setState5',
-  t: 'write0',
-  y: 'write1',
-  i: 'writeSeparator',
-  u: 'blank',
-  e: 'moveLeft',
-  r: 'moveRight',
-  o: 'step',
-  p: 'play',
-  a: 'stop',
-  s: 'reset',
+  a: 'moveLeft',
+  s: 'moveRight',
+  d: 'write1',
+  f: 'write0',
+  g: 'blank',
+  h: 'writeSeparator',
+  w: 'step',
+  e: 'reset',
+  t: 'play',
+  y: 'stop',
 }
 
 export const pianoActionLabels: Record<PianoAction, string> = {
-  setState0: 'q0',
-  setState1: 'q1',
-  setState2: 'q2',
-  setState3: 'q3',
-  setState4: 'q4',
-  setState5: 'q5',
-  write0: '0',
-  write1: '1',
-  writeSeparator: '#',
-  blank: '□',
   moveLeft: '←',
   moveRight: '→',
+  write1: '1',
+  write0: '0',
+  blank: '□',
+  writeSeparator: '#',
   step: '⏭',
-  play: '▶',
-  stop: '⏹',
   reset: '↺',
+  play: '▶',
+  stop: '⏸',
 }
 
 const superscriptDigits = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹']
@@ -97,7 +84,7 @@ function toSuperscript(n: number): string {
 
 export function formatBitPosition(bitIndex: number): string {
   const sup = `2${toSuperscript(bitIndex)}`
-  return bitIndex === 0 ? `第 0 bit（個位 ${sup}）` : `第 ${bitIndex} bit（${sup} 位）`
+  return bitIndex === 0 ? `bit 0 (ones ${sup})` : `bit ${bitIndex} (${sup} place)`
 }
 
 export function formatTapeSymbol(symbol?: TapeSymbol): string {
@@ -127,17 +114,6 @@ function invalidInput(snapshot: MachineSnapshot): MachineSnapshot {
   const parsed = parseOperationInput('add', tapeText(snapshot.tape))
   if (parsed.ok) return snapshot
   return { ...snapshot, error: parsed.error.message, lastEvent: { state: snapshot.state, message: parsed.error.message } }
-}
-
-function tapeBounds(tape: Record<number, TapeSymbol>): { first: number; separator: number; last: number } {
-  const positions = Object.keys(tape)
-    .map(Number)
-    .filter((pos) => tape[pos] === '0' || tape[pos] === '1' || tape[pos] === 'separator')
-    .sort((a, b) => a - b)
-  const first = positions[0] ?? 0
-  const last = positions[positions.length - 1] ?? 2
-  const separator = positions.find((pos) => tape[pos] === 'separator') ?? Math.floor((first + last) / 2)
-  return { first, separator, last }
 }
 
 function trimLeadingZeroPositions(tape: Record<number, TapeSymbol>, positions: number[]): number[] {
@@ -232,7 +208,8 @@ function startBitReadA(
   action?: PianoAction,
 ): MachineSnapshot {
   const { aPositions, bPositions, eqPos, onesPos, maxBits, separatorPos } = program
-  const nextGear = computeBitGear(snapshot.tape, aPositions, bPositions, bitIndex, maxBits, carryIn)
+  const tape = bitIndex === 0 ? { ...snapshot.tape, [eqPos]: 'equals' as const } : snapshot.tape
+  const nextGear = computeBitGear(tape, aPositions, bPositions, bitIndex, maxBits, carryIn)
   const aIdx = aPositions.length - 1 - bitIndex
   const hasA = aIdx >= 0
   const aPos = hasA ? aPositions[aIdx] : aPositions[0]
@@ -246,17 +223,17 @@ function startBitReadA(
     sumBit: (afterARatchet % 2) as 0 | 1,
     carryOut: (afterARatchet >= 2 ? 1 : 0) as 0 | 1,
     phase: 'READ_A',
-    bellRung: false,
     punching: false,
   }
   const bitLabel = formatBitPosition(bitIndex)
-  const carryPrefix = carryIn === 1 ? '上一位進位栓先將棘輪推至第 1 格，' : bitIndex > 0 ? '棘輪歸零後，' : ''
+  const carryPrefix = carryIn === 1 ? 'Previous carry advances ratchet to notch 1; ' : bitIndex > 0 ? 'Ratchet resets to 0; ' : ''
   const message = hasA
-    ? `① 讀取 A 的${bitLabel}（位置 ${aPos}）：${carryPrefix}探針讀到 ${nextGear.aBit}，推進爪推 +${nextGear.aBit} 齒 → 止回爪鎖定第 ${afterARatchet} 格。`
-    : `① 讀取 A 的${bitLabel}：A 無此高位（視為 0，+0 齒），${carryIn === 1 ? '由上一位進位栓推至第 1 格' : '棘輪維持第 0 格'}。`
+    ? `① Read A's ${bitLabel} (pos ${aPos}): ${carryPrefix}feeler pin senses ${nextGear.aBit}, driving pawl pushes +${nextGear.aBit} tooth → locking pawl holds notch ${afterARatchet}.`
+    : `① Read A's ${bitLabel}: no higher bit in A (treated as 0, +0 tooth); ${carryIn === 1 ? 'advanced to notch 1 by previous carry' : 'ratchet stays at notch 0'}.`
 
   return {
     ...snapshot,
+    tape,
     state: 'SCAN',
     head: aPos,
     step: snapshot.step + 1,
@@ -295,52 +272,13 @@ function inputOnlyTape(tape: Record<number, TapeSymbol>): Record<number, TapeSym
 export function applyPianoAction(snapshot: MachineSnapshot, action: PianoAction): MachineSnapshot {
   if (action === 'reset') {
     const restartingAfterHalt = snapshot.halted
-    return { ...snapshot, tape: restartingAfterHalt ? {} : snapshot.tape, state: 'INPUT', head: 0, step: 0, carry: 0, halted: false, gear: undefined, result: undefined, error: undefined, program: undefined, lastEvent: { state: 'INPUT', message: restartingAfterHalt ? 'Result cleared; enter a new Tape input.' : 'Machine reset; Tape preserved.', action } }
+    return { ...snapshot, tape: restartingAfterHalt ? {} : inputOnlyTape(snapshot.tape), state: 'INPUT', head: 0, step: 0, carry: 0, halted: false, gear: undefined, result: undefined, error: undefined, program: undefined, lastEvent: { state: 'INPUT', message: restartingAfterHalt ? 'Result cleared; enter a new Tape input.' : 'Machine reset; Tape preserved.', action } }
   }
-  if (action === 'stop') return { ...snapshot, halted: true, state: 'HALT', lastEvent: { state: 'HALT', message: 'Stopped by operator.', action } }
-  if (action.startsWith('setState')) {
-    const stageNum = Number(action.slice(-1))
-    const baseTape = inputOnlyTape(snapshot.tape)
-    const text = tapeText(baseTape)
-    const parsed = parseOperationInput('add', text)
-    if (parsed.ok) {
-      const bounds = tapeBounds(baseTape)
-      const cleanInput: MachineSnapshot = {
-        ...snapshot,
-        tape: baseTape,
-        head: bounds.last,
-        state: 'INPUT',
-        carry: 0,
-        halted: false,
-        gear: undefined,
-        result: undefined,
-        error: undefined,
-        program: undefined,
-      }
-      if (stageNum === 0) {
-        return {
-          ...cleanInput,
-          lastEvent: { state: 'INPUT', message: 'q0 待命：棘輪歸零，保留紙帶題目。', action },
-        }
-      }
-      let current = applyPianoAction(cleanInput, 'play')
-      const targetPhase: MechanicalPhase =
-        stageNum === 1
-          ? 'READ_A'
-          : stageNum === 2
-            ? 'READ_B'
-            : stageNum === 3
-              ? 'BELL_EQ'
-              : stageNum === 4
-                ? 'STAMP_SUM'
-                : 'STAMP_CARRY'
-      while (!current.halted && current.gear?.phase !== targetPhase) {
-        current = runStep(current)
-      }
-      return current
+  if (action === 'stop') {
+    if (snapshot.program && !snapshot.halted) {
+      return { ...snapshot, lastEvent: { state: snapshot.state, message: 'Paused by operator.', action } }
     }
-    const state = `q${stageNum}` as StateId
-    return { ...snapshot, state, error: undefined, lastEvent: { state, message: `State register set to ${state}.`, action } }
+    return { ...snapshot, halted: true, state: 'HALT', lastEvent: { state: 'HALT', message: 'Stopped by operator.', action } }
   }
 
   let tape = { ...snapshot.tape }
@@ -406,8 +344,8 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
     const prevNotch = (gear.carryIn + gear.aBit) as 0 | 1 | 2 | 3
     const pawlStroke: 0 | 1 = hasB ? gear.bBit : 0
     const message = hasB
-      ? `② 讀取 B 的${bitLabel}（位置 ${bPos}）：探針讀到 ${gear.bBit}，同一支推進爪再推 +${gear.bBit} 齒 → 棘輪從第 ${prevNotch} 格推至第 ${gear.ratchetTotal} 格${gear.carryOut ? '，頂出進位栓 LOCK 1' : ''}。`
-      : `② 讀取 B 的${bitLabel}：B 無此高位（視為 0，+0 齒）→ 棘輪維持在第 ${gear.ratchetTotal} 格${gear.carryOut ? '，頂出進位栓 LOCK 1' : ''}。`
+      ? `② Read B's ${bitLabel} (pos ${bPos}): feeler pin senses ${gear.bBit}, same driving pawl pushes +${gear.bBit} tooth → ratchet advances from notch ${prevNotch} to ${gear.ratchetTotal}${gear.carryOut ? ', locking Carry Latch (LOCK 1)' : ''}.`
+      : `② Read B's ${bitLabel}: no higher bit in B (treated as 0, +0 tooth) → ratchet stays at notch ${gear.ratchetTotal}${gear.carryOut ? ', locking Carry Latch (LOCK 1)' : ''}.`
 
     return {
       ...snapshot,
@@ -419,7 +357,6 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
         pawlStroke,
         prevNotch,
         phase: 'READ_B',
-        bellRung: false,
         punching: false,
       },
       step: snapshot.step + 1,
@@ -430,26 +367,8 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
     }
   }
 
-  // On bit 0, after READ_B we ring the bell and stamp '=' at eqPos
-  if (snapshot.state === 'ADD' && bitIndex === 0) {
-    const tape = { ...snapshot.tape, [eqPos]: 'equals' as const }
-    return {
-      ...snapshot,
-      tape,
-      state: 'CARRY',
-      head: eqPos,
-      carry: gear.carryOut,
-      gear: { ...gear, pawlStroke: 0, prevNotch: gear.ratchetTotal, phase: 'BELL_EQ', bellRung: true, punching: true },
-      step: snapshot.step + 1,
-      lastEvent: {
-        state: 'CARRY',
-        message: `③ 當——！讀完${bitLabel}，推進爪彈回待命、止回爪鎖定第 ${gear.ratchetTotal} 格，在位置 ${eqPos} 打孔印下「=」。`,
-      },
-    }
-  }
-
-  // Stamp current bit's sumBit (after BELL_EQ on bit 0, or directly after READ_B on bitIndex >= 1)
-  if (snapshot.state === 'CARRY' || (snapshot.state === 'ADD' && bitIndex > 0)) {
+  // Step 2 -> Step 3: READ_B -> STAMP_SUM (stamp current bit's sumBit)
+  if (snapshot.state === 'ADD') {
     const targetPos = onesPos - bitIndex
     const bit = (gear.sumBit === 1 ? '1' : '0') as '0' | '1'
     const tape = { ...snapshot.tape, [targetPos]: bit }
@@ -464,21 +383,21 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
         state: 'HALT',
         halted: true,
         carry: 0,
-        gear: { ...gear, pawlStroke: 0, phase: 'STAMP_SUM', bellRung: false, punching: true },
+        gear: { ...gear, pawlStroke: 0, phase: 'STAMP_SUM', punching: true },
         step: snapshot.step + 1,
         result: readResultFromTape(tape, eqPos),
         lastEvent: {
           state: 'HALT',
-          message: `④ 奇偶凸輪打孔（結果的${bitLabel}，位置 ${targetPos}）：棘輪第 ${gear.ratchetTotal} 格（${gear.sumBit === 1 ? '奇數凸齒' : '偶數凹槽'}）印下 ${bit}，無進位，算式完成！`,
+          message: `③ Odd-even cam stamps sum's ${bitLabel} (pos ${targetPos}): ratchet notch ${gear.ratchetTotal} (${gear.sumBit === 1 ? 'odd lobe' : 'even valley'}) punches ${bit}; no carry out, calculation complete!`,
         },
       }
     }
 
     const nextHint = isLastInputBit
-      ? '（進位栓 LOCK 1 準備釋放印最高位）'
+      ? ' (Carry Latch LOCK 1 ready to release for MSB)'
       : gear.carryOut === 1
-        ? `（進位栓 LOCK 1 留給${formatBitPosition(bitIndex + 1)}）`
-        : `（繼續往左算${formatBitPosition(bitIndex + 1)}）`
+        ? ` (Carry Latch LOCK 1 held for ${formatBitPosition(bitIndex + 1)})`
+        : ` (stepping left to ${formatBitPosition(bitIndex + 1)})`
 
     return {
       ...snapshot,
@@ -486,11 +405,11 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
       head: targetPos,
       state: 'WRITE',
       carry: gear.carryOut,
-      gear: { ...gear, pawlStroke: 0, phase: 'STAMP_SUM', bellRung: false, punching: true },
+      gear: { ...gear, pawlStroke: 0, phase: 'STAMP_SUM', punching: true },
       step: snapshot.step + 1,
       lastEvent: {
         state: 'WRITE',
-        message: `④ 奇偶凸輪打孔（結果的${bitLabel}，位置 ${targetPos}）：棘輪第 ${gear.ratchetTotal} 格（${gear.sumBit === 1 ? '奇數凸齒' : '偶數凹槽'}）印下 ${bit}${nextHint}。`,
+        message: `③ Odd-even cam stamps sum's ${bitLabel} (pos ${targetPos}): ratchet notch ${gear.ratchetTotal} (${gear.sumBit === 1 ? 'odd lobe' : 'even valley'}) punches ${bit}${nextHint}.`,
       },
     }
   }
@@ -500,7 +419,7 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
     return startBitReadA(snapshot, snapshot.program, bitIndex + 1, gear.carryOut)
   }
 
-  // Final carry release (STAMP_CARRY) at bitIndex = maxBits
+  // Step 3 -> Step 4: Final carry release (STAMP_CARRY) at bitIndex = maxBits
   const targetPos = onesPos - maxBits
   const tape = { ...snapshot.tape, [targetPos]: '1' as const }
   const carryBitLabel = formatBitPosition(maxBits)
@@ -518,14 +437,13 @@ export function runStep(snapshot: MachineSnapshot): MachineSnapshot {
       ratchetTotal: 0,
       bitIndex: maxBits,
       phase: 'STAMP_CARRY',
-      bellRung: false,
       punching: true,
     },
     step: snapshot.step + 1,
     result: readResultFromTape(tape, eqPos),
     lastEvent: {
       state: 'HALT',
-      message: `⑤ 釋放進位栓（結果的${carryBitLabel}，位置 ${targetPos}）：讀寫頭往左退一格，進位栓彈回 FREE 0 並打孔印下最高位進位 1，算式完成！`,
+      message: `④ Release Carry Latch (sum's ${carryBitLabel}, pos ${targetPos}): head steps left, latch springs back to FREE 0 and punches final carry 1. Calculation complete!`,
     },
   }
 }

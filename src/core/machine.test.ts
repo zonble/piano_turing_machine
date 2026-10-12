@@ -53,17 +53,20 @@ describe('piano-first machine', () => {
     expect(tapeText(machine.tape)).toBe('10#1=11')
   })
 
-  it('exposes the simple physical keyboard mapping', () => {
-    expect(pianoActions.y).toBe('write1')
-    expect(pianoActions.z).toBe('setState0')
-    expect(pianoActions.r).toBe('moveRight')
-    expect(pianoActions.i).toBe('writeSeparator')
-    expect(pianoActions.p).toBe('play')
-    expect(pianoActions.a).toBe('stop')
-    expect(pianoActions.s).toBe('reset')
+  it('exposes the single-octave physical keyboard mapping', () => {
+    expect(pianoActions.a).toBe('moveLeft')
+    expect(pianoActions.s).toBe('moveRight')
+    expect(pianoActions.d).toBe('write1')
+    expect(pianoActions.f).toBe('write0')
+    expect(pianoActions.g).toBe('blank')
+    expect(pianoActions.h).toBe('writeSeparator')
+    expect(pianoActions.w).toBe('step')
+    expect(pianoActions.e).toBe('reset')
+    expect(pianoActions.t).toBe('play')
+    expect(pianoActions.y).toBe('stop')
   })
 
-  it('decomposes 1#1 into 5 mechanical steps: read A, read B, ring bell & stamp =, stamp ones 0, release carry & stamp twos 1', () => {
+  it('decomposes 1#1 into 4 mechanical steps: read A, read B, stamp ones 0, release carry & stamp twos 1', () => {
     const inputMachine = enterOnePlusOne()
     // During INPUT, gear is not engaged yet
     expect(inputMachine.gear).toBeUndefined()
@@ -72,6 +75,7 @@ describe('piano-first machine', () => {
     let m = applyPianoAction(inputMachine, 'play')
     expect(m.state).toBe('SCAN')
     expect(m.head).toBe(0)
+    expect(m.tape[3]).toBe('equals')
     expect(m.gear?.pawlStroke).toBe(1)
     expect(m.gear?.prevNotch).toBe(0)
     expect(m.gear?.ratchetTotal).toBe(1)
@@ -88,17 +92,7 @@ describe('piano-first machine', () => {
     expect(m.carry).toBe(1)
     expect(m.gear?.phase).toBe('READ_B')
 
-    // Step 3 (ADD -> CARRY / BELL_EQ): driving pawl retracts (0), locking pawl holds notch 2, rings bell, head at 3, stamps '='
-    m = runStep(m)
-    expect(m.state).toBe('CARRY')
-    expect(m.head).toBe(3)
-    expect(m.tape[3]).toBe('equals')
-    expect(m.gear?.pawlStroke).toBe(0)
-    expect(m.gear?.ratchetTotal).toBe(2)
-    expect(m.gear?.bellRung).toBe(true)
-    expect(m.gear?.phase).toBe('BELL_EQ')
-
-    // Step 4 (CARRY -> WRITE / STAMP_SUM): head moves to ones place (5), stamps '0'
+    // Step 3 (ADD -> WRITE / STAMP_SUM): head moves to ones place (5), stamps '0'
     m = runStep(m)
     expect(m.state).toBe('WRITE')
     expect(m.head).toBe(5)
@@ -107,7 +101,7 @@ describe('piano-first machine', () => {
     expect(m.gear?.pawlStroke).toBe(0)
     expect(m.gear?.phase).toBe('STAMP_SUM')
 
-    // Step 5 (WRITE -> HALT / STAMP_CARRY): head steps left to twos place (4), releases carry latch, stamps '1'
+    // Step 4 (WRITE -> HALT / STAMP_CARRY): head steps left to twos place (4), releases carry latch, stamps '1'
     m = runStep(m)
     expect(m.state).toBe('HALT')
     expect(m.halted).toBe(true)
@@ -138,47 +132,34 @@ describe('piano-first machine', () => {
     expect(m.state).toBe('ADD')
     expect(m.gear?.phase).toBe('READ_B')
 
-    m = applyPianoAction(m, 'step') // Step 3: BELL_EQ
-    expect(m.state).toBe('CARRY')
-    expect(m.gear?.phase).toBe('BELL_EQ')
-
-    m = applyPianoAction(m, 'step') // Step 4: STAMP_SUM
+    m = applyPianoAction(m, 'step') // Step 3: STAMP_SUM
     expect(m.state).toBe('WRITE')
     expect(m.gear?.phase).toBe('STAMP_SUM')
 
-    m = applyPianoAction(m, 'step') // Step 5: STAMP_CARRY -> HALT
+    m = applyPianoAction(m, 'step') // Step 4: STAMP_CARRY -> HALT
     expect(m.state).toBe('HALT')
     expect(m.halted).toBe(true)
     expect(tapeText(m.tape)).toBe('1#1=10')
   })
 
-  it('allows playing the 5 mechanical stages directly via the q1..q5 (setState1..setState5) piano keys', () => {
-    let m = enterOnePlusOne()
-
-    m = applyPianoAction(m, 'setState1') // q1: READ_A
+  it('pauses and resumes cleanly using stop (pause) and play/step', () => {
+    let m = applyPianoAction(enterOnePlusOne(), 'play')
     expect(m.state).toBe('SCAN')
     expect(m.gear?.phase).toBe('READ_A')
-    expect(m.gear?.ratchetTotal).toBe(1)
 
-    m = applyPianoAction(m, 'setState2') // q2: READ_B
+    m = applyPianoAction(m, 'stop')
+    expect(m.state).toBe('SCAN')
+    expect(m.gear?.phase).toBe('READ_A')
+
+    // play resumes from the paused state without skipping a step
+    m = applyPianoAction(m, 'play')
+    expect(m.state).toBe('SCAN')
+    expect(m.gear?.phase).toBe('READ_A')
+
+    // step advances to the next mechanical stage
+    m = applyPianoAction(m, 'step')
     expect(m.state).toBe('ADD')
     expect(m.gear?.phase).toBe('READ_B')
-    expect(m.gear?.ratchetTotal).toBe(2)
-
-    m = applyPianoAction(m, 'setState3') // q3: BELL_EQ
-    expect(m.state).toBe('CARRY')
-    expect(m.gear?.phase).toBe('BELL_EQ')
-    expect(m.tape[3]).toBe('equals')
-
-    m = applyPianoAction(m, 'setState4') // q4: STAMP_SUM
-    expect(m.state).toBe('WRITE')
-    expect(m.gear?.phase).toBe('STAMP_SUM')
-    expect(m.tape[5]).toBe('0')
-
-    m = applyPianoAction(m, 'setState5') // q5: STAMP_CARRY -> HALT
-    expect(m.state).toBe('HALT')
-    expect(m.halted).toBe(true)
-    expect(tapeText(m.tape)).toBe('1#1=10')
   })
 
   it('steps through multi-bit addition (101101#11) bit-by-bit from right to left with detailed bit explanations', () => {
@@ -191,35 +172,32 @@ describe('piano-first machine', () => {
     }
     expect(tapeText(m.tape)).toBe('101101#11')
 
-    // Bit 0 (個位 2⁰): reads A at pos 5 ('1'), then B at pos 8 ('1')
+    // Bit 0 (ones 2⁰): reads A at pos 5 ('1'), then B at pos 8 ('1')
     m = applyPianoAction(m, 'play')
     expect(m.head).toBe(5)
+    expect(m.tape[9]).toBe('equals')
     expect(m.gear?.bitIndex).toBe(0)
     expect(m.gear?.ratchetTotal).toBe(1)
-    expect(m.lastEvent?.message).toContain('讀取 A 的第 0 bit（個位 2⁰）')
+    expect(m.lastEvent?.message).toContain("Read A's bit 0 (ones 2⁰)")
 
     m = runStep(m) // READ_B bit 0 at pos 8 ('1')
     expect(m.head).toBe(8)
     expect(m.gear?.bitIndex).toBe(0)
     expect(m.gear?.ratchetTotal).toBe(2)
     expect(m.gear?.carryOut).toBe(1)
-    expect(m.lastEvent?.message).toContain('讀取 B 的第 0 bit（個位 2⁰）')
-
-    m = runStep(m) // BELL_EQ at pos 9
-    expect(m.head).toBe(9)
-    expect(m.tape[9]).toBe('equals')
+    expect(m.lastEvent?.message).toContain("Read B's bit 0 (ones 2⁰)")
 
     m = runStep(m) // STAMP_SUM bit 0 at pos 15 ('0')
     expect(m.head).toBe(15)
     expect(m.tape[15]).toBe('0')
 
-    // Bit 1 (2¹ 位): carries 1 in, reads A at pos 4 ('0') -> ratchet at 1
+    // Bit 1 (2¹ place): carries 1 in, reads A at pos 4 ('0') -> ratchet at 1
     m = runStep(m)
     expect(m.head).toBe(4)
     expect(m.gear?.bitIndex).toBe(1)
     expect(m.gear?.carryIn).toBe(1)
     expect(m.gear?.ratchetTotal).toBe(1)
-    expect(m.lastEvent?.message).toContain('讀取 A 的第 1 bit（2¹ 位）')
+    expect(m.lastEvent?.message).toContain("Read A's bit 1 (2¹ place)")
 
     // Finish remaining steps and verify every bit of 101101 + 11 = 110000 (45 + 3 = 48)
     while (!m.halted) {
