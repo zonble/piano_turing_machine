@@ -180,13 +180,30 @@ function shortestStepDelta(fromIdx: number, toIdx: number, count: number): numbe
   return diff
 }
 
+const HELP_SEEN_STORAGE_KEY = 'piano_turing_machine_help_seen_v1'
+
 function App() {
   const [machine, setMachine] = useState<MachineSnapshot>(() => createInitialMachine())
   const [running, setRunning] = useState(false)
   const [pressedKey, setPressedKey] = useState<number | null>(null)
   const [turretSteps, setTurretSteps] = useState(0)
-  const [helpOpen, setHelpOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(HELP_SEEN_STORAGE_KEY) !== '1'
+    } catch {
+      return true
+    }
+  })
   const cells = useMemo(() => tapePositions(machine.head), [machine.head])
+
+  const closeHelp = () => {
+    try {
+      window.localStorage.setItem(HELP_SEEN_STORAGE_KEY, '1')
+    } catch {
+      // ignore storage errors
+    }
+    setHelpOpen(false)
+  }
 
   const dispatch = (action: PianoAction, keyIndex?: number) => {
     const resolvedKeyIndex = keyIndex ?? actionToKeyIndex[action]
@@ -248,12 +265,16 @@ function App() {
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return
       if (event.key === 'Escape' && helpOpen) {
         event.preventDefault()
-        setHelpOpen(false)
+        closeHelp()
         return
       }
       if (event.key === '?') {
         event.preventDefault()
-        setHelpOpen((open) => !open)
+        if (helpOpen) {
+          closeHelp()
+        } else {
+          setHelpOpen(true)
+        }
         return
       }
       if (helpOpen) return
@@ -653,7 +674,7 @@ function App() {
       <div
         className="help-backdrop"
         role="presentation"
-        onClick={() => setHelpOpen(false)}
+        onClick={closeHelp}
       >
         <div
           className="help-modal"
@@ -671,7 +692,7 @@ function App() {
               type="button"
               className="help-close"
               aria-label="Close manual"
-              onClick={() => setHelpOpen(false)}
+              onClick={closeHelp}
             >
               ×
             </button>
@@ -680,11 +701,26 @@ function App() {
           <div className="help-modal-body">
             <section className="help-section">
               <h3>1. The Concept: What If Turing Built His Machine in 1900?</h3>
+              <figure className="help-exhibit-figure">
+                <img
+                  src="/concept-product.jpg"
+                  alt="1900 Piano Turing Machine museum exhibit with bidirectional paper tape, 8-tooth state gear, and rotary gear turret"
+                />
+                <figcaption>
+                  <span>EXHIBIT RECONSTRUCTION · LONDON c. 1900</span>
+                  <span>Left: Bidirectional Paper Tape &amp; Tracker Bar · Center: 8-Tooth State Register · Right: Rotary Gear Turret, 4-Notch Ratchet &amp; Bell</span>
+                </figcaption>
+              </figure>
               <p>
                 In computing history, there is a century-long conceptual gap between <b>19th-century mechanical calculators</b> (built from brass gears) and <b>Alan Turing&apos;s 1936 universal machine</b> (conceived as pure mathematical symbols on an infinite tape). Every physical component needed to build a Turing machine already existed in <b>1900</b>—inside a parlor player piano and a mechanical desk calculator:
               </p>
               <div className="help-era-grid">
                 <div className="era-card">
+                  <img
+                    className="era-thumb"
+                    src="/era-babbage.jpg"
+                    alt="Pascal and Babbage brass gear columns where each digit requires its own gear wheel"
+                  />
                   <span className="era-year">1642 – 1830s</span>
                   <strong>Pascal &amp; Babbage&apos;s Gear Calculators</strong>
                   <p>
@@ -692,6 +728,11 @@ function App() {
                   </p>
                 </div>
                 <div className="era-card">
+                  <img
+                    className="era-thumb"
+                    src="/era-pianola.jpg"
+                    alt="1900s Player Piano perforated paper roll gliding over a brass pneumatic tracker bar"
+                  />
                   <span className="era-year">1900s</span>
                   <strong>The Player Piano (Pianola)</strong>
                   <p>
@@ -699,6 +740,11 @@ function App() {
                   </p>
                 </div>
                 <div className="era-card highlight">
+                  <img
+                    className="era-thumb"
+                    src="/concept-product.jpg"
+                    alt="1900 Piano Turing Machine combining a bidirectional paper tape, state gear, and 1-bit ratchet turret"
+                  />
                   <span className="era-year">1936 → 1900</span>
                   <strong>The Piano Turing Machine</strong>
                   <p>
