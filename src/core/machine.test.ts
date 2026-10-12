@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyPianoAction, createInitialMachine, octalTapeText, pianoActions, runStep, tapeText, type PianoAction } from './machine'
+import { applyPianoAction, createInitialMachine, octalTapeText, pianoActions, runStep, selectGear, tapeText, type PianoAction } from './machine'
 
 const enterOnePlusOne = () => {
   let machine = createInitialMachine()
@@ -205,5 +205,42 @@ describe('piano-first machine', () => {
     }
     expect(tapeText(m.tape)).toBe('101101#11=110000')
     expect(m.result).toEqual({ binary: '110000', decimal: 48, octal: '60' })
+  })
+
+  it('cycles gears via nextGear (j) and prevGear (u) piano actions', () => {
+    expect(pianoActions.u).toBe('prevGear')
+    expect(pianoActions.j).toBe('nextGear')
+
+    let m = createInitialMachine()
+    expect(m.operation).toBe('add')
+    m = applyPianoAction(m, 'nextGear')
+    expect(m.operation).toBe('subtract')
+    m = applyPianoAction(m, 'prevGear')
+    expect(m.operation).toBe('add')
+  })
+
+  it.each([
+    ['subtract', '101#11', '101#11=010', '10', 2],
+    ['multiply', '11#10', '11#10=110', '110', 6],
+    ['and', '110#101', '110#101=100', '100', 4],
+    ['or', '110#101', '110#101=111', '111', 7],
+    ['xor', '110#101', '110#101=011', '11', 3],
+    ['increment', '1011', '1011=1100', '1100', 12],
+    ['shift', '101', '101=1010', '1010', 10],
+    ['not', '1010', '1010=0101', '0101', 5],
+  ] as const)('executes replaceable gear %s on %s -> %s', (gear, raw, expectedTape, expectedBin, expectedDec) => {
+    let m = selectGear(createInitialMachine(), gear)
+    for (let i = 0; i < raw.length; i += 1) {
+      const ch = raw[i]
+      m = applyPianoAction(m, ch === '1' ? 'write1' : ch === '0' ? 'write0' : 'writeSeparator')
+      if (i < raw.length - 1) m = applyPianoAction(m, 'moveRight')
+    }
+    m = applyPianoAction(m, 'play')
+    while (!m.halted) {
+      m = runStep(m)
+    }
+    expect(tapeText(m.tape)).toBe(expectedTape)
+    expect(m.result?.binary).toBe(expectedBin)
+    expect(m.result?.decimal).toBe(expectedDec)
   })
 })

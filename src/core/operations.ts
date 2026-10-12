@@ -1,10 +1,14 @@
 export type OperationId =
-  | 'increment'
-  | 'shift'
   | 'add'
   | 'subtract'
   | 'multiply'
   | 'divide'
+  | 'and'
+  | 'or'
+  | 'xor'
+  | 'increment'
+  | 'shift'
+  | 'not'
   | 'palindrome'
 
 export type ValidationCode =
@@ -37,6 +41,9 @@ const binaryOperations = new Set<OperationId>([
   'subtract',
   'multiply',
   'divide',
+  'and',
+  'or',
+  'xor',
 ])
 
 const normalizeOperand = (operand: string) => operand.replace(/^0+(?=\d)/, '')
@@ -54,30 +61,30 @@ export function parseOperationInput(
 
   if (binaryOperations.has(operation)) {
     if (input.split('#').length !== 2) {
-      return failure('ERR_SEPARATOR', '雙元運算需要一個 # 分隔左右兩個參數。')
+      return failure('ERR_SEPARATOR', 'Binary operation requires a single # separating A and B.')
     }
 
     const [left, right] = input.split('#')
     if (!left || !right) {
-      return failure('ERR_EMPTY_OPERAND', '左右兩個參數都不能是空的。')
+      return failure('ERR_EMPTY_OPERAND', 'Both left and right operands are required.')
     }
 
     if (!/^[01]+$/.test(left) || !/^[01]+$/.test(right)) {
-      return failure('ERR_INVALID_SYMBOL', '參數只能包含二進位符號 0 和 1。')
+      return failure('ERR_INVALID_SYMBOL', 'Operands may only contain binary digits 0 and 1.')
     }
 
     const normalizedLeft = normalizeOperand(left)
     const normalizedRight = normalizeOperand(right)
 
     if (operation === 'divide' && normalizedRight === '0') {
-      return failure('ERR_DIV_ZERO', '除數不能是 0。')
+      return failure('ERR_DIV_ZERO', 'Divisor cannot be 0.')
     }
 
     if (
       operation === 'subtract' &&
       BigInt(`0b${normalizedLeft}`) < BigInt(`0b${normalizedRight}`)
     ) {
-      return failure('ERR_NEGATIVE_RESULT', '目前的 Tape 不支援負數結果。')
+      return failure('ERR_NEGATIVE_RESULT', 'Negative results are not supported on the tape (require A ≥ B).')
     }
 
     return {
@@ -89,18 +96,18 @@ export function parseOperationInput(
   }
 
   if (input.includes('#')) {
-    return failure('ERR_UNEXPECTED_SEPARATOR', '這個運算只接受一個二進位參數。')
+    return failure('ERR_UNEXPECTED_SEPARATOR', 'This unary gear takes a single binary number without #.')
   }
 
   if (!input) {
-    return failure('ERR_EMPTY_OPERAND', '參數不能是空的。')
+    return failure('ERR_EMPTY_OPERAND', 'Operand cannot be empty.')
   }
 
   if (!/^[01]+$/.test(input)) {
-    return failure('ERR_INVALID_SYMBOL', '參數只能包含二進位符號 0 和 1。')
+    return failure('ERR_INVALID_SYMBOL', 'Operand may only contain binary digits 0 and 1.')
   }
 
-  const normalized = normalizeOperand(input)
+  const normalized = operation === 'not' ? input : normalizeOperand(input)
   return { ok: true, operation, operands: [normalized], input: normalized }
 }
 

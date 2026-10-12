@@ -1,5 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { applyPianoAction, createInitialMachine, formatBitPosition, formatTapeSymbol, octalTapeText, pianoActions, runStep, tapeText, type MachineSnapshot, type MechanicalPhase, type PianoAction } from './core/machine'
+import {
+  applyPianoAction,
+  createInitialMachine,
+  decimalTapeText,
+  formatBitPosition,
+  formatTapeSymbol,
+  GEAR_MODES,
+  GEAR_SPECS,
+  octalTapeText,
+  pianoActions,
+  runStep,
+  selectGear,
+  tapeText,
+  type GearMode,
+  type MachineSnapshot,
+  type MechanicalPhase,
+  type PianoAction,
+} from './core/machine'
 import { pianoFrequency, playFinalChord, playPunchStamp, playRatchetClick, playTone } from './core/audio'
 import './App.css'
 
@@ -8,7 +25,7 @@ const octaveKeys: Array<{
   note: string
   isBlack: boolean
   shortcut: string
-  action?: PianoAction
+  action: PianoAction
   symbol: string
   sublabel: string
 }> = [
@@ -22,8 +39,8 @@ const octaveKeys: Array<{
   { midi: 67, note: 'G4', isBlack: false, shortcut: 'g', action: 'blank', symbol: '□', sublabel: 'So · G' },
   { midi: 68, note: 'G♯4', isBlack: true, shortcut: 'y', action: 'stop', symbol: '⏸', sublabel: 'pause · Y' },
   { midi: 69, note: 'A4', isBlack: false, shortcut: 'h', action: 'writeSeparator', symbol: '#', sublabel: 'La · H' },
-  { midi: 70, note: 'A♯4', isBlack: true, shortcut: 'u', symbol: '·', sublabel: 'A♯ · U' },
-  { midi: 71, note: 'B4', isBlack: false, shortcut: 'j', symbol: 'Si', sublabel: 'Si · J' },
+  { midi: 70, note: 'A♯4', isBlack: true, shortcut: 'u', action: 'prevGear', symbol: '◀⚙', sublabel: 'gear · U' },
+  { midi: 71, note: 'B4', isBlack: false, shortcut: 'j', action: 'nextGear', symbol: '⚙▶', sublabel: 'Si · J' },
 ]
 
 const stateNames = ['q0', 'q1', 'q2', 'q3', 'q4', 'HALT'] as const
@@ -50,12 +67,47 @@ const stateRegister = (snapshot: MachineSnapshot): (typeof stateNames)[number] =
 }
 const tapePositions = (head: number) => Array.from({ length: 19 }, (_, index) => head - 9 + index)
 
-const mechanicalStages: Array<{ id: MechanicalPhase; step: string; code: string; title: string; detail: string }> = [
-  { id: 'READ_A', step: '①', code: 'q1', title: 'Read A & Push', detail: 'Driving pawl strokes → locking pawl holds' },
-  { id: 'READ_B', step: '②', code: 'q2', title: 'Read B & Add', detail: 'Same pawl strokes → sets carry latch' },
-  { id: 'STAMP_SUM', step: '③', code: 'q3', title: 'Cam Stamps Bit', detail: 'Odd/even cam → punches current bit' },
-  { id: 'STAMP_CARRY', step: '④', code: 'q4', title: 'Step Left & Carry', detail: 'Shift left → release carry latch' },
-]
+function getMechanicalStages(mode: GearMode): Array<{ id: MechanicalPhase; step: string; code: string; title: string; detail: string }> {
+  const spec = GEAR_SPECS[mode]
+  if (spec.isUnary) {
+    return [
+      { id: 'READ_A', step: '①', code: 'q1', title: 'Read A & Push', detail: 'Feeler pin probes A → drives ratchet' },
+      { id: 'READ_B', step: '②', code: 'q2', title: 'Unary (Skip B)', detail: 'Single-operand gear → no B needed' },
+      { id: 'STAMP_SUM', step: '③', code: 'q3', title: 'Cam Stamps Bit', detail: `${spec.camLabel} → punches bit` },
+      { id: 'STAMP_CARRY', step: '④', code: 'q4', title: 'Step Left & Latch', detail: 'Shift left → release MSB carry/shift' },
+    ]
+  }
+  if (mode === 'subtract') {
+    return [
+      { id: 'READ_A', step: '①', code: 'q1', title: 'Read A (+Push)', detail: 'Driving pawl advances +A tooth' },
+      { id: 'READ_B', step: '②', code: 'q2', title: 'Read B (−Pull)', detail: 'Reverse pawl pulls −B → borrow latch' },
+      { id: 'STAMP_SUM', step: '③', code: 'q3', title: 'Diff Cam Stamps', detail: 'Odd/even cam → punches diff bit' },
+      { id: 'STAMP_CARRY', step: '④', code: 'q4', title: 'Propagate Borrow', detail: 'Shift left → apply borrow to next bit' },
+    ]
+  }
+  if (mode === 'multiply') {
+    return [
+      { id: 'READ_A', step: '①', code: 'q1', title: 'Probe Multiplicand A', detail: 'Aligns shifted A with current place' },
+      { id: 'READ_B', step: '②', code: 'q2', title: 'Read B & Clutch', detail: 'If B=1, clutch adds shifted A' },
+      { id: 'STAMP_SUM', step: '③', code: 'q3', title: 'Product Cam Stamps', detail: 'Punches product bit, holds upper sum' },
+      { id: 'STAMP_CARRY', step: '④', code: 'q4', title: 'Release Upper Sum', detail: 'Shift left → punches final MSB' },
+    ]
+  }
+  if (mode === 'and' || mode === 'or' || mode === 'xor') {
+    return [
+      { id: 'READ_A', step: '①', code: 'q1', title: 'Read A & Push', detail: 'Driving pawl pushes +A tooth' },
+      { id: 'READ_B', step: '②', code: 'q2', title: 'Read B & Push', detail: 'Same pawl pushes +B (0..2 teeth)' },
+      { id: 'STAMP_SUM', step: '③', code: 'q3', title: `${spec.shortName} Cam Stamps`, detail: `${spec.camLabel} → punches bit` },
+      { id: 'STAMP_CARRY', step: '④', code: 'q4', title: 'No Carry (Unhooked)', detail: 'Bitwise logic has no carry between bits' },
+    ]
+  }
+  return [
+    { id: 'READ_A', step: '①', code: 'q1', title: 'Read A & Push', detail: 'Driving pawl strokes → locking pawl holds' },
+    { id: 'READ_B', step: '②', code: 'q2', title: 'Read B & Add', detail: 'Same pawl strokes → sets carry latch' },
+    { id: 'STAMP_SUM', step: '③', code: 'q3', title: 'Cam Stamps Bit', detail: 'Odd/even cam → punches current bit' },
+    { id: 'STAMP_CARRY', step: '④', code: 'q4', title: 'Step Left & Carry', detail: 'Shift left → release carry latch' },
+  ]
+}
 
 function polarPoint(angleRad: number, radius: number): string {
   const x = (radius * Math.sin(angleRad)).toFixed(2)
@@ -83,7 +135,6 @@ function buildRatchetWheelPath(teeth = 12, outerR = 56, innerR = 42): string {
   for (let i = 0; i < teeth; i += 1) {
     const start = i * step
     const next = (i + 1) * step
-    // Steep radial locking cliff, then long asymmetric sawtooth ramp
     const tip = polarPoint(start, outerR)
     const gullet = polarPoint(start + step * 0.1, innerR)
     const nextTip = polarPoint(next, outerR)
@@ -96,9 +147,7 @@ const spurGearPath = buildSpurGearPath(14, 55, 45)
 const ratchetWheelPath = buildRatchetWheelPath(12, 56, 42)
 
 const actionToKeyIndex = Object.fromEntries(
-  octaveKeys
-    .map((k, idx) => (k.action ? [k.action, idx] : null))
-    .filter((entry): entry is [PianoAction, number] => entry !== null),
+  octaveKeys.map((k, idx) => [k.action, idx]),
 ) as Record<PianoAction, number>
 
 function keyIndexForStep(snapshot: MachineSnapshot): number {
@@ -133,6 +182,9 @@ function App() {
     const next = applyPianoAction(machine, action)
     setMachine(next)
     playTone(pianoFrequency(octaveKeys[resolvedKeyIndex].midi))
+    if (action === 'prevGear' || action === 'nextGear') {
+      playRatchetClick(1)
+    }
     if ((action === 'play' || action === 'step') && next.gear?.phase) {
       playPhaseSound(next)
     }
@@ -141,7 +193,15 @@ function App() {
       window.setTimeout(() => setPressedKey(null), 180)
     }
     if (action === 'play' && !next.halted && next.program) setRunning(true)
-    if (action === 'step' || action === 'stop' || action === 'reset' || next.halted) setRunning(false)
+    if (action === 'step' || action === 'stop' || action === 'reset' || action === 'prevGear' || action === 'nextGear' || next.halted) {
+      setRunning(false)
+    }
+  }
+
+  const handleSelectGear = (mode: GearMode) => {
+    setRunning(false)
+    setMachine((current) => selectGear(current, mode))
+    playRatchetClick(1)
   }
 
   useEffect(() => {
@@ -177,15 +237,16 @@ function App() {
       }
       if (action) {
         dispatch(action, keyIndex >= 0 ? keyIndex : undefined)
-      } else if (keyIndex >= 0) {
-        playTone(pianoFrequency(octaveKeys[keyIndex].midi))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  const activeSpec = GEAR_SPECS[machine.operation]
+  const mechanicalStages = useMemo(() => getMechanicalStages(machine.operation), [machine.operation])
   const rawTape = tapeText(machine.tape)
+  const decimalTape = decimalTapeText(rawTape)
   const octalTape = octalTapeText(rawTape)
   const activeGear = machine.gear
   const activePhase = activeGear?.phase
@@ -194,8 +255,8 @@ function App() {
   // During INPUT, ratchet stays at 0 until ▶ / ⏭ starts decomposition
   const isProbing = activePhase === 'READ_A' || activePhase === 'READ_B'
   const pawlStroke = isProbing ? (activeGear?.pawlStroke ?? 0) : 0
-  const ratchetNotch = activeGear ? activeGear.ratchetTotal : 0
-  const sumBit = activeGear ? (ratchetNotch % 2 as 0 | 1) : null
+  const ratchetNotch = (activeGear ? activeGear.ratchetTotal : 0) as 0 | 1 | 2 | 3
+  const camHigh = activeGear ? activeGear.sumBit === 1 : activeSpec.camLobes.includes(0)
   const carryLatched = activeGear ? activeGear.carryOut === 1 : false
   const hammerPunching = Boolean(activeGear?.punching)
 
@@ -204,10 +265,12 @@ function App() {
   const gearWorking = running || ['SCAN', 'ADD', 'WRITE'].includes(machine.state)
   const gearPhaseLabel = currentBitLabel && activePhase
     ? `${currentBitLabel} · ${activePhase}`
-    : activePhase ?? (machine.state === 'HALT' ? 'HALT' : 'READY (NOTCH 0)')
-  const gearSummary = activeGear && machine.lastEvent?.message
-    ? machine.lastEvent.message
-    : 'Ratchet at 0 (00₂). Enter A#B on the piano, then press ▶ or ⏭ to add bit by bit.'
+    : activePhase ?? (machine.state === 'HALT' ? 'HALT' : `${activeSpec.shortName} · READY`)
+  const gearSummary = machine.error
+    ? `⚠ ${machine.error}`
+    : activeGear && machine.lastEvent?.message
+      ? machine.lastEvent.message
+      : activeSpec.idleNote
 
   const currentStateSlot = stateRegister(machine)
   const stateIndex = Math.max(0, stateNames.indexOf(currentStateSlot))
@@ -221,9 +284,9 @@ function App() {
   const probeStatusText = activePhase === 'READ_A' && currentBitLabel
     ? `READ A ${currentBitLabel} · ${probeDropThrough ? '● HOLE (1) → +1 TOOTH' : '○ SOLID (0) → +0 TOOTH'}`
     : activePhase === 'READ_B' && currentBitLabel
-      ? `READ B ${currentBitLabel} · ${isSeparatorCell ? 'NO BIT → +0 TOOTH' : probeDropThrough ? '● HOLE (1) → +1 TOOTH' : '○ SOLID (0) → +0 TOOTH'}`
+      ? `READ B ${currentBitLabel} · ${isSeparatorCell ? 'NO BIT → +0 TOOTH' : probeDropThrough ? `● HOLE (1) → ${machine.operation === 'subtract' ? '−1 TOOTH' : '+1 TOOTH'}` : '○ SOLID (0) → +0 TOOTH'}`
       : isEqualsCell
-        ? 'DOUBLE SLOT (=) · SEPARATES INPUT & SUM'
+        ? 'DOUBLE SLOT (=) · SEPARATES INPUT & RESULT'
         : isSeparatorCell
           ? '⊞ TWIN HOLES (#) · SEPARATES OPERANDS'
           : hammerPunching && currentBitLabel
@@ -236,8 +299,39 @@ function App() {
                   ? '○ SOLID PAPER (0) · PIN BLOCKED (+0)'
                   : `${currentSymbol} AT ${machine.head >= 0 ? '+' : ''}${machine.head} · TRACKER BAR`
 
+  const pawlStrokeLabel = isProbing
+    ? pawlStroke === -1
+      ? '−1 TOOTH'
+      : pawlStroke === 1
+        ? '+1 TOOTH'
+        : '+0 TOOTH'
+    : 'IDLE'
+
   return <main className="app-shell">
-    <header className="masthead"><div><h1>Piano <em>Turing</em> Machine</h1></div></header>
+    <header className="masthead">
+      <div><h1>Piano <em>Turing</em> Machine</h1></div>
+      <div className="gear-rack" role="tablist" aria-label="Replaceable mechanical gear cartridges">
+        <span className="rack-label">GEAR CARTRIDGE (U / J):</span>
+        {GEAR_MODES.map((mode) => {
+          const spec = GEAR_SPECS[mode]
+          const active = machine.operation === mode
+          return (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`gear-chip ${active ? 'active' : ''}`}
+              onClick={() => handleSelectGear(mode)}
+              title={`${spec.title} — Input: ${spec.formula}`}
+            >
+              <strong>{spec.shortName}</strong>
+              <small>{spec.title.replace(/^[A-Z]+\s*/, '')}</small>
+            </button>
+          )
+        })}
+      </div>
+    </header>
 
     <section className="stage-strip" aria-label="4-step mechanical decomposition">
       {mechanicalStages.map((stage, index) => {
@@ -260,7 +354,7 @@ function App() {
 
     <section className="machine-board">
       <section className={`tape-module module ${isProbing ? 'probing' : ''}`}>
-        <div className="module-heading"><span>TAPE + TRACKER BAR</span><span>{probeStatusText}</span></div>
+        <div className="module-heading"><span>TAPE + TRACKER BAR ({activeSpec.formula})</span><span>{probeStatusText}</span></div>
         <div className="tape-window">
           <div
             className={`playhead-frame ${hammerPunching ? 'punching' : ''} ${probeDropThrough ? 'probe-open' : ''} ${probeBlocked ? 'probe-blocked' : ''} ${isSeparatorCell ? 'probe-separator' : ''} ${isEqualsCell ? 'probe-equals' : ''}`}
@@ -326,8 +420,10 @@ function App() {
         <div className="tape-readout">
           <div className="tape-readout-stack">
             <span>RAW <b>{rawTape || 'blank'}</b></span>
+            <span>DEC <b>{decimalTape || 'blank'}</b></span>
             <span>OCT <b>{octalTape || 'blank'}</b></span>
           </div>
+          <span>GEAR <b>{activeSpec.title}</b></span>
           <span>HEAD <b>{machine.head}</b></span>
           <span>STEP <b>{String(machine.step).padStart(3, '0')}</b></span>
         </div>
@@ -378,17 +474,17 @@ function App() {
       </section>
 
       <section className={`operation-module module ${gearWorking ? 'working' : ''}`}>
-        <div className="module-heading"><span>ARITHMETIC RATCHET</span><span>{gearPhaseLabel}</span></div>
-        <div className="ratchet-bench" aria-label="1900s 4-notch mechanical adder mechanism">
+        <div className="module-heading"><span>{activeSpec.title} RATCHET</span><span>{gearPhaseLabel}</span></div>
+        <div className="ratchet-bench" aria-label="1900s 4-notch mechanical ratchet mechanism">
           <div className="pawl-stack">
-            <div className={`input-pawl ${isProbing && pawlStroke === 1 ? 'pushing' : ''}`} aria-label="Driving pawl">
-              <span className="pawl-tag">①② DRIVING PAWL</span>
-              <strong>{isProbing ? (pawlStroke === 1 ? '+1 TOOTH' : '+0 TOOTH') : 'IDLE'}</strong>
+            <div className={`input-pawl ${isProbing && pawlStroke !== 0 ? 'pushing' : ''}`} aria-label="Driving pawl">
+              <span className="pawl-tag">{activeSpec.pawlLabel}</span>
+              <strong>{pawlStrokeLabel}</strong>
               <i className="pawl-claw" aria-hidden="true" />
             </div>
-            <div className={`input-pawl ${activePhase === 'STAMP_SUM' ? 'pushing' : sumBit === 1 ? 'engaged' : ''}`} aria-label="Odd-even cam">
-              <span className="pawl-tag">③ ODD/EVEN CAM</span>
-              <strong>{sumBit === null ? 'VALLEY 0' : sumBit === 1 ? 'LOBE 1' : 'VALLEY 0'}</strong>
+            <div className={`input-pawl ${activePhase === 'STAMP_SUM' ? 'pushing' : camHigh ? 'engaged' : ''}`} aria-label="Cam follower">
+              <span className="pawl-tag">{activeSpec.camLabel}</span>
+              <strong>{camHigh ? 'LOBE 1' : 'VALLEY 0'}</strong>
               <i className="pawl-claw" aria-hidden="true" />
             </div>
           </div>
@@ -398,25 +494,43 @@ function App() {
             <div
               className={`ratchet-wheel notch-${ratchetNotch}`}
               style={{ transform: `rotate(${-ratchetNotch * 90}deg)` }}
-              aria-label={`4-notch adder wheel at notch ${ratchetNotch}`}
+              aria-label={`4-notch wheel at notch ${ratchetNotch}`}
             >
               <svg className="wheel-svg ratchet-svg" viewBox="-60 -60 120 120" aria-hidden="true">
                 <path d={ratchetWheelPath} className="gear-rim ratchet-rim" />
                 <circle cx="0" cy="0" r="39" className="gear-inner-ring" />
               </svg>
-              <span className="wheel-notch n0"><b>0</b><small>00₂</small></span>
-              <span className="wheel-notch n1 odd-cam"><b>1</b><small>01₂</small></span>
-              <span className="wheel-notch n2 carry-cam"><b>2</b><small>10₂</small></span>
-              <span className="wheel-notch n3 odd-cam carry-cam"><b>3</b><small>11₂</small></span>
+              {([0, 1, 2, 3] as const).map((n) => {
+                const isLobe = activeSpec.camLobes.includes(n)
+                const isCarry = activeSpec.carryNotches.includes(n)
+                const bin = n.toString(2).padStart(2, '0')
+                return (
+                  <span
+                    key={n}
+                    className={`wheel-notch n${n} ${isLobe ? 'odd-cam' : ''} ${isCarry ? 'carry-cam' : ''}`}
+                  >
+                    <b>{n}</b>
+                    <small>{bin}₂</small>
+                  </span>
+                )
+              })}
               <div className="wheel-hub"><span>N{ratchetNotch}</span></div>
             </div>
           </div>
 
           <div className="right-mechanisms">
-            <div className={`carry-latch ${carryLatched ? 'latched' : ''} ${activePhase === 'STAMP_CARRY' ? 'releasing' : ''}`} aria-label="Carry latch pin">
-              <span className="latch-title">④ CARRY LATCH</span>
+            <div className={`carry-latch ${carryLatched ? 'latched' : ''} ${activePhase === 'STAMP_CARRY' ? 'releasing' : ''}`} aria-label="Carry or borrow latch">
+              <span className="latch-title">{activeSpec.latchLabel}</span>
               <div className="latch-track"><div className="latch-bolt" /></div>
-              <strong>{activePhase === 'STAMP_CARRY' ? 'RELEASE → 1' : carryLatched ? 'LOCK 1' : 'FREE 0'}</strong>
+              <strong>
+                {activeSpec.carryNotches.length === 0
+                  ? 'UNHOOKED'
+                  : activePhase === 'STAMP_CARRY'
+                    ? 'RELEASE → 1'
+                    : carryLatched
+                      ? 'LOCK 1'
+                      : 'FREE 0'}
+              </strong>
             </div>
           </div>
         </div>
@@ -425,7 +539,7 @@ function App() {
     </section>
 
     <section className="piano-module module">
-      <div className="module-heading"><span>PIANO CONTROL (SINGLE OCTAVE C4–B4)</span><span>WHITE KEYS: TAPE I/O · BLACK KEYS: TRANSPORT</span></div>
+      <div className="module-heading"><span>PIANO CONTROL (SINGLE OCTAVE C4–B4)</span><span>WHITE KEYS: TAPE I/O &amp; GEAR ▶ · BLACK KEYS: TRANSPORT &amp; ◀ GEAR</span></div>
       <div className="piano-wrap">
         <div className="piano">
           <div className="keybed">
@@ -440,8 +554,7 @@ function App() {
                   onClick={() => {
                     setPressedKey(index)
                     window.setTimeout(() => setPressedKey(null), 180)
-                    if (k.action) dispatch(k.action, index)
-                    else playTone(pianoFrequency(k.midi))
+                    dispatch(k.action, index)
                   }}
                 >
                   <span>{k.symbol}</span>
@@ -458,9 +571,9 @@ function App() {
         <span><b>□ #</b> (So/La · G/H) Clear / Sep</span>
         <span><b>⏭ ↺</b> (C♯/D♯ · W/E) Step / Reset</span>
         <span><b>▶ ⏸</b> (F♯/G♯ · T/Y) Play / Pause</span>
+        <span><b>◀⚙ ⚙▶</b> (A♯/Si · U/J) Swap Gear</span>
       </div>
     </section>
-    <p className="one-plus-one">1 + 1: <b>1 (Mi)</b> → <b>→ (Re)</b> → <b># (La)</b> → <b>→ (Re)</b> → <b>1 (Mi)</b> → <b>▶ (F♯)</b> (or press <b>⏭ (C♯)</b> to step)</p>
   </main>
 }
 
