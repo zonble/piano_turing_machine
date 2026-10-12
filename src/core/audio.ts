@@ -123,4 +123,35 @@ export function playFinalChord() {
   }
 }
 
+export function playTurretClunk() {
+  const audio = getContext()
+  const now = audio.currentTime
+
+  // Heavy brass turret barrel rotation thud
+  const bodyOsc = audio.createOscillator()
+  const bodyGain = audio.createGain()
+  bodyOsc.type = 'triangle'
+  bodyOsc.frequency.setValueAtTime(140, now)
+  bodyOsc.frequency.exponentialRampToValueAtTime(52, now + 0.065)
+  bodyGain.gain.setValueAtTime(0.0001, now)
+  bodyGain.gain.linearRampToValueAtTime(0.09, now + 0.005)
+  bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075)
+  bodyOsc.connect(bodyGain).connect(audio.destination)
+  bodyOsc.start(now)
+  bodyOsc.stop(now + 0.085)
+
+  // Spring-loaded detent ball locking click (45ms later)
+  const detentOsc = audio.createOscillator()
+  const detentGain = audio.createGain()
+  detentOsc.type = 'sawtooth'
+  detentOsc.frequency.setValueAtTime(520, now + 0.045)
+  detentOsc.frequency.exponentialRampToValueAtTime(180, now + 0.095)
+  detentGain.gain.setValueAtTime(0.0001, now + 0.045)
+  detentGain.gain.linearRampToValueAtTime(0.075, now + 0.05)
+  detentGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1)
+  detentOsc.connect(detentGain).connect(audio.destination)
+  detentOsc.start(now + 0.045)
+  detentOsc.stop(now + 0.11)
+}
+
 export const pianoFrequency = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12)

@@ -17,7 +17,7 @@ import {
   type MechanicalPhase,
   type PianoAction,
 } from './core/machine'
-import { pianoFrequency, playFinalChord, playPunchStamp, playRatchetClick, playTone } from './core/audio'
+import { pianoFrequency, playFinalChord, playPunchStamp, playRatchetClick, playTone, playTurretClunk } from './core/audio'
 import './App.css'
 
 const octaveKeys: Array<{
@@ -39,7 +39,7 @@ const octaveKeys: Array<{
   { midi: 67, note: 'G4', isBlack: false, shortcut: 'g', action: 'blank', symbol: '□', sublabel: 'So · G' },
   { midi: 68, note: 'G♯4', isBlack: true, shortcut: 'y', action: 'stop', symbol: '⏸', sublabel: 'pause · Y' },
   { midi: 69, note: 'A4', isBlack: false, shortcut: 'h', action: 'writeSeparator', symbol: '#', sublabel: 'La · H' },
-  { midi: 70, note: 'A♯4', isBlack: true, shortcut: 'u', action: 'prevGear', symbol: '◀⚙', sublabel: 'gear · U' },
+  { midi: 70, note: 'A♯4', isBlack: true, shortcut: 'u', action: 'prevGear', symbol: '◀⚙', sublabel: 'turret · U' },
   { midi: 71, note: 'B4', isBlack: false, shortcut: 'j', action: 'nextGear', symbol: '⚙▶', sublabel: 'Si · J' },
 ]
 
@@ -145,6 +145,8 @@ function buildRatchetWheelPath(teeth = 12, outerR = 56, innerR = 42): string {
 
 const spurGearPath = buildSpurGearPath(14, 55, 45)
 const ratchetWheelPath = buildRatchetWheelPath(12, 56, 42)
+const turretPlatePath = buildSpurGearPath(27, 57, 52)
+const miniGearPath = buildSpurGearPath(8, 17, 13)
 
 const actionToKeyIndex = Object.fromEntries(
   octaveKeys.map((k, idx) => [k.action, idx]),
@@ -171,10 +173,19 @@ function playPhaseSound(snapshot: MachineSnapshot) {
   }
 }
 
+function shortestStepDelta(fromIdx: number, toIdx: number, count: number): number {
+  let diff = (toIdx - fromIdx) % count
+  if (diff > count / 2) diff -= count
+  if (diff < -count / 2) diff += count
+  return diff
+}
+
 function App() {
   const [machine, setMachine] = useState<MachineSnapshot>(() => createInitialMachine())
   const [running, setRunning] = useState(false)
   const [pressedKey, setPressedKey] = useState<number | null>(null)
+  const [turretSteps, setTurretSteps] = useState(0)
+  const [helpOpen, setHelpOpen] = useState(false)
   const cells = useMemo(() => tapePositions(machine.head), [machine.head])
 
   const dispatch = (action: PianoAction, keyIndex?: number) => {
@@ -182,8 +193,12 @@ function App() {
     const next = applyPianoAction(machine, action)
     setMachine(next)
     playTone(pianoFrequency(octaveKeys[resolvedKeyIndex].midi))
-    if (action === 'prevGear' || action === 'nextGear') {
-      playRatchetClick(1)
+    if (action === 'prevGear') {
+      setTurretSteps((s) => s - 1)
+      playTurretClunk()
+    } else if (action === 'nextGear') {
+      setTurretSteps((s) => s + 1)
+      playTurretClunk()
     }
     if ((action === 'play' || action === 'step') && next.gear?.phase) {
       playPhaseSound(next)
@@ -199,9 +214,14 @@ function App() {
   }
 
   const handleSelectGear = (mode: GearMode) => {
+    const currentIdx = GEAR_MODES.indexOf(machine.operation)
+    const targetIdx = GEAR_MODES.indexOf(mode)
+    if (currentIdx === targetIdx) return
+    const delta = shortestStepDelta(currentIdx, targetIdx, GEAR_MODES.length)
+    setTurretSteps((s) => s + delta)
     setRunning(false)
     setMachine((current) => selectGear(current, mode))
-    playRatchetClick(1)
+    playTurretClunk()
   }
 
   useEffect(() => {
@@ -226,6 +246,17 @@ function App() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key === 'Escape' && helpOpen) {
+        event.preventDefault()
+        setHelpOpen(false)
+        return
+      }
+      if (event.key === '?') {
+        event.preventDefault()
+        setHelpOpen((open) => !open)
+        return
+      }
+      if (helpOpen) return
       const pressed = event.key.toLowerCase()
       const keyIndex = octaveKeys.findIndex((k) => k.shortcut === pressed)
       const action = pianoActions[pressed]
@@ -265,7 +296,7 @@ function App() {
   const gearWorking = running || ['SCAN', 'ADD', 'WRITE'].includes(machine.state)
   const gearPhaseLabel = currentBitLabel && activePhase
     ? `${currentBitLabel} · ${activePhase}`
-    : activePhase ?? (machine.state === 'HALT' ? 'HALT' : `${activeSpec.shortName} · READY`)
+    : activePhase ?? (machine.state === 'HALT' ? 'HALT' : `${activeSpec.title}`)
   const gearSummary = machine.error
     ? `⚠ ${machine.error}`
     : activeGear && machine.lastEvent?.message
@@ -275,6 +306,8 @@ function App() {
   const currentStateSlot = stateRegister(machine)
   const stateIndex = Math.max(0, stateNames.indexOf(currentStateSlot))
   const stateStepDeg = 360 / stateNames.length
+  const turretStepDeg = 360 / GEAR_MODES.length
+  const turretRotationDeg = -turretSteps * turretStepDeg
 
   const currentCellSymbol = machine.tape[machine.head]
   const probeDropThrough = isProbing && currentCellSymbol === '1'
@@ -309,28 +342,21 @@ function App() {
 
   return <main className="app-shell">
     <header className="masthead">
-      <div><h1>Piano <em>Turing</em> Machine</h1></div>
-      <div className="gear-rack" role="tablist" aria-label="Replaceable mechanical gear cartridges">
-        <span className="rack-label">GEAR CARTRIDGE (U / J):</span>
-        {GEAR_MODES.map((mode) => {
-          const spec = GEAR_SPECS[mode]
-          const active = machine.operation === mode
-          return (
-            <button
-              key={mode}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className={`gear-chip ${active ? 'active' : ''}`}
-              onClick={() => handleSelectGear(mode)}
-              title={`${spec.title} — Input: ${spec.formula}`}
-            >
-              <strong>{spec.shortName}</strong>
-              <small>{spec.title.replace(/^[A-Z]+\s*/, '')}</small>
-            </button>
-          )
-        })}
+      <div>
+        <h1>
+          Piano <em>Turing</em> Machine
+          <span className="masthead-sub"> — What if player pianos had bidirectional tapes?</span>
+        </h1>
       </div>
+      <button
+        type="button"
+        className="help-trigger"
+        aria-label="Open operator manual"
+        title="Operator Manual (?)"
+        onClick={() => setHelpOpen(true)}
+      >
+        ?
+      </button>
     </header>
 
     <section className="stage-strip" aria-label="4-step mechanical decomposition">
@@ -474,22 +500,62 @@ function App() {
       </section>
 
       <section className={`operation-module module ${gearWorking ? 'working' : ''}`}>
-        <div className="module-heading"><span>{activeSpec.title} RATCHET</span><span>{gearPhaseLabel}</span></div>
-        <div className="ratchet-bench" aria-label="1900s 4-notch mechanical ratchet mechanism">
-          <div className="pawl-stack">
-            <div className={`input-pawl ${isProbing && pawlStroke !== 0 ? 'pushing' : ''}`} aria-label="Driving pawl">
-              <span className="pawl-tag">{activeSpec.pawlLabel}</span>
-              <strong>{pawlStrokeLabel}</strong>
-              <i className="pawl-claw" aria-hidden="true" />
-            </div>
-            <div className={`input-pawl ${activePhase === 'STAMP_SUM' ? 'pushing' : camHigh ? 'engaged' : ''}`} aria-label="Cam follower">
-              <span className="pawl-tag">{activeSpec.camLabel}</span>
-              <strong>{camHigh ? 'LOBE 1' : 'VALLEY 0'}</strong>
-              <i className="pawl-claw" aria-hidden="true" />
+        <div className="module-heading"><span>ROTARY GEAR TURRET &amp; RATCHET</span><span>{gearPhaseLabel}</span></div>
+        <div className="turret-ratchet-bench" aria-label="Rotary gear turret meshing with 4-notch ratchet">
+          <div className="turret-housing">
+            <div className="turret-caption">TURRET (CLICK / U·J)</div>
+            <div
+              className="turret-wheel"
+              style={{ transform: `rotate(${turretRotationDeg}deg)` }}
+              role="tablist"
+              aria-label="9-gear rotary revolver turret"
+            >
+              <svg className="wheel-svg turret-svg" viewBox="-60 -60 120 120" aria-hidden="true">
+                <path d={turretPlatePath} className="gear-rim turret-rim" />
+                <circle cx="0" cy="0" r="46" className="gear-inner-ring" />
+                <circle cx="0" cy="0" r="24" className="turret-core-ring" />
+              </svg>
+              {GEAR_MODES.map((mode, idx) => {
+                const spec = GEAR_SPECS[mode]
+                const isSelected = machine.operation === mode
+                const stationAngle = idx * turretStepDeg + 90
+                const counterAngle = -turretRotationDeg - stationAngle
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    className={`turret-station ${isSelected ? 'active' : ''}`}
+                    style={{ transform: `rotate(${stationAngle}deg) translateY(-44px)` }}
+                    onClick={() => handleSelectGear(mode)}
+                    title={`${spec.title} (${spec.formula})`}
+                  >
+                    <svg className="mini-gear-svg" viewBox="-20 -20 40 40" aria-hidden="true">
+                      <path d={miniGearPath} className="mini-gear-rim" />
+                      <circle cx="0" cy="0" r="9.5" className="mini-gear-bore" />
+                    </svg>
+                    <b style={{ transform: `rotate(${counterAngle}deg)` }}>{spec.shortName}</b>
+                  </button>
+                )
+              })}
+              <div
+                className="wheel-hub turret-hub"
+                style={{ transform: `rotate(${-turretRotationDeg}deg)` }}
+              >
+                <span>{activeSpec.shortName}</span>
+                <small>U ◀ ▶ J</small>
+              </div>
             </div>
           </div>
 
+          <div className="mesh-bridge" title="Turret gear meshed with arithmetic ratchet">
+            <span className="mesh-arrow">▶</span>
+            <small>MESH</small>
+          </div>
+
           <div className="ratchet-housing">
+            <div className="turret-caption">4-NOTCH RATCHET</div>
             <div className="index-pawl" title="Top Locking Pawl">▼</div>
             <div
               className={`ratchet-wheel notch-${ratchetNotch}`}
@@ -517,21 +583,29 @@ function App() {
               <div className="wheel-hub"><span>N{ratchetNotch}</span></div>
             </div>
           </div>
+        </div>
 
-          <div className="right-mechanisms">
-            <div className={`carry-latch ${carryLatched ? 'latched' : ''} ${activePhase === 'STAMP_CARRY' ? 'releasing' : ''}`} aria-label="Carry or borrow latch">
-              <span className="latch-title">{activeSpec.latchLabel}</span>
-              <div className="latch-track"><div className="latch-bolt" /></div>
-              <strong>
-                {activeSpec.carryNotches.length === 0
-                  ? 'UNHOOKED'
-                  : activePhase === 'STAMP_CARRY'
-                    ? 'RELEASE → 1'
-                    : carryLatched
-                      ? 'LOCK 1'
-                      : 'FREE 0'}
-              </strong>
-            </div>
+        <div className="actuator-strip">
+          <div className={`input-pawl ${isProbing && pawlStroke !== 0 ? 'pushing' : ''}`} aria-label="Driving pawl">
+            <span className="pawl-tag">{activeSpec.pawlLabel}</span>
+            <strong>{pawlStrokeLabel}</strong>
+          </div>
+          <div className={`input-pawl ${activePhase === 'STAMP_SUM' ? 'pushing' : camHigh ? 'engaged' : ''}`} aria-label="Cam follower">
+            <span className="pawl-tag">{activeSpec.camLabel}</span>
+            <strong>{camHigh ? 'LOBE 1' : 'VALLEY 0'}</strong>
+          </div>
+          <div className={`carry-latch ${carryLatched ? 'latched' : ''} ${activePhase === 'STAMP_CARRY' ? 'releasing' : ''}`} aria-label="Carry or borrow latch">
+            <span className="latch-title">{activeSpec.latchLabel}</span>
+            <div className="latch-track"><div className="latch-bolt" /></div>
+            <strong>
+              {activeSpec.carryNotches.length === 0
+                ? 'UNHOOKED'
+                : activePhase === 'STAMP_CARRY'
+                  ? 'RELEASE → 1'
+                  : carryLatched
+                    ? 'LOCK 1'
+                    : 'FREE 0'}
+            </strong>
           </div>
         </div>
         <p className="module-note">{gearSummary}</p>
@@ -539,7 +613,7 @@ function App() {
     </section>
 
     <section className="piano-module module">
-      <div className="module-heading"><span>PIANO CONTROL (SINGLE OCTAVE C4–B4)</span><span>WHITE KEYS: TAPE I/O &amp; GEAR ▶ · BLACK KEYS: TRANSPORT &amp; ◀ GEAR</span></div>
+      <div className="module-heading"><span>PIANO CONTROL (SINGLE OCTAVE C4–B4)</span><span>WHITE KEYS: TAPE I/O &amp; TURRET ▶ · BLACK KEYS: TRANSPORT &amp; ◀ TURRET</span></div>
       <div className="piano-wrap">
         <div className="piano">
           <div className="keybed">
@@ -571,9 +645,163 @@ function App() {
         <span><b>□ #</b> (So/La · G/H) Clear / Sep</span>
         <span><b>⏭ ↺</b> (C♯/D♯ · W/E) Step / Reset</span>
         <span><b>▶ ⏸</b> (F♯/G♯ · T/Y) Play / Pause</span>
-        <span><b>◀⚙ ⚙▶</b> (A♯/Si · U/J) Swap Gear</span>
+        <span><b>◀⚙ ⚙▶</b> (A♯/Si · U/J) Rotate Turret</span>
       </div>
     </section>
+
+    {helpOpen && (
+      <div
+        className="help-backdrop"
+        role="presentation"
+        onClick={() => setHelpOpen(false)}
+      >
+        <div
+          className="help-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="help-modal-title"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="help-modal-header">
+            <div>
+              <span className="eyebrow">CURATOR&apos;S NOTE &amp; OPERATOR&apos;S MANUAL</span>
+              <h2 id="help-modal-title">The 1900 Missing Link of Computing</h2>
+            </div>
+            <button
+              type="button"
+              className="help-close"
+              aria-label="Close manual"
+              onClick={() => setHelpOpen(false)}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="help-modal-body">
+            <section className="help-section">
+              <h3>1. The Concept: What If Turing Built His Machine in 1900?</h3>
+              <p>
+                In computing history, there is a century-long conceptual gap between <b>19th-century mechanical calculators</b> (built from brass gears) and <b>Alan Turing&apos;s 1936 universal machine</b> (conceived as pure mathematical symbols on an infinite tape). Every physical component needed to build a Turing machine already existed in <b>1900</b>—inside a parlor player piano and a mechanical desk calculator:
+              </p>
+              <div className="help-era-grid">
+                <div className="era-card">
+                  <span className="era-year">1642 – 1830s</span>
+                  <strong>Pascal &amp; Babbage&apos;s Gear Calculators</strong>
+                  <p>
+                    Every digit required its own physical gear column. To add 40-digit numbers, you had to machine 40 interlocking brass wheels—bounded by hardware size.
+                  </p>
+                </div>
+                <div className="era-card">
+                  <span className="era-year">1900s</span>
+                  <strong>The Player Piano (Pianola)</strong>
+                  <p>
+                    Perforated paper rolls glided over a brass <b>Tracker Bar</b>. Whenever a punched hole passed an air port, suction tripped a pneumatic striker to play a piano key.
+                  </p>
+                </div>
+                <div className="era-card highlight">
+                  <span className="era-year">1936 → 1900</span>
+                  <strong>The Piano Turing Machine</strong>
+                  <p>
+                    Instead of 40 gear columns for 40 bits, a <b>single 1-bit ratchet wheel</b> rides back and forth across a <b>perforated paper tape</b>—computing numbers of <em>unlimited length</em>.
+                  </p>
+                </div>
+              </div>
+              <p className="help-hint">
+                <b>Why this matters:</b> Moving memory off the gears and onto a scrollable paper tape is the exact leap from a fixed calculator to a general-purpose computer. Swapping the cam wheel on the <b>9-Gear Rotary Turret</b> transforms the same 4-notch ratchet into an <b>ALU</b> capable of Addition, Subtraction, Multiplication, and Bitwise Logic.
+              </p>
+            </section>
+
+            <section className="help-section">
+              <h3>2. Quick Start: Computing 1 + 1 = 2 (Binary 10)</h3>
+              <p>
+                Punching a symbol writes onto the <b>current cell</b> without moving the tape head, so move right one cell between each symbol to write <code>1#1</code>:
+              </p>
+              <div className="help-recipe-steps">
+                <div className="recipe-step">
+                  <span className="step-badge">Step 1</span>
+                  <span className="step-action">Punch first number <code>1</code></span>
+                  <kbd>D</kbd>
+                  <small>Piano key: Mi (<code>1</code>)</small>
+                </div>
+                <div className="recipe-step">
+                  <span className="step-badge">Step 2</span>
+                  <span className="step-action">Move head to next cell</span>
+                  <kbd>S</kbd>
+                  <small>Piano key: Re (<code>→</code>)</small>
+                </div>
+                <div className="recipe-step">
+                  <span className="step-badge">Step 3</span>
+                  <span className="step-action">Punch operand separator <code>#</code></span>
+                  <kbd>H</kbd>
+                  <small>Piano key: La (<code>#</code>)</small>
+                </div>
+                <div className="recipe-step">
+                  <span className="step-badge">Step 4</span>
+                  <span className="step-action">Move head to next cell</span>
+                  <kbd>S</kbd>
+                  <small>Piano key: Re (<code>→</code>)</small>
+                </div>
+                <div className="recipe-step">
+                  <span className="step-badge">Step 5</span>
+                  <span className="step-action">Punch second number <code>1</code></span>
+                  <kbd>D</kbd>
+                  <small>Piano key: Mi (<code>1</code>)</small>
+                </div>
+                <div className="recipe-step run">
+                  <span className="step-badge">Step 6</span>
+                  <span className="step-action">Start the clockwork</span>
+                  <kbd>T</kbd>
+                  <small>F♯ (<code>▶ Play</code>) or <kbd>W</kbd> (<code>⏭ Step</code>)</small>
+                </div>
+              </div>
+              <p className="help-hint">
+                <b>Tip:</b> Multi-bit numbers work the same way — e.g. for <code>7 × 2 = 14</code>, rotate the turret to <b>MUL</b> (<kbd>J</kbd>) and punch <code>111#10</code>. For single-operand gears (<b>INC</b>, <b>SHL</b>, <b>NOT</b>), omit <code>#</code>.
+              </p>
+            </section>
+
+            <section className="help-section">
+              <h3>3. Single-Octave Piano Keyboard (C4–B4)</h3>
+              <div className="help-grid">
+                <div>
+                  <strong>White Keys (Tape &amp; Turret)</strong>
+                  <ul>
+                    <li><b>Do (A) / Re (S)</b>: Move tape head Left <code>←</code> / Right <code>→</code></li>
+                    <li><b>Mi (D) / Fa (F)</b>: Punch <code>1</code> (open hole) / <code>0</code> (solid mark)</li>
+                    <li><b>So (G) / La (H)</b>: Clear cell <code>□</code> / Punch separator <code>#</code></li>
+                    <li><b>Si (J)</b>: Rotate Gear Turret forward <code>⚙▶</code></li>
+                  </ul>
+                </div>
+                <div>
+                  <strong>Black Keys (Transport &amp; Turret)</strong>
+                  <ul>
+                    <li><b>C♯ (W)</b>: <code>⏭ Step</code> — advance 1 mechanical stage</li>
+                    <li><b>D♯ (E)</b>: <code>↺ Reset</code> — reset head (or clear finished result)</li>
+                    <li><b>F♯ (T)</b>: <code>▶ Play</code> — auto-step through the tape</li>
+                    <li><b>G♯ (Y)</b>: <code>⏸ Pause</code> — pause at current stage</li>
+                    <li><b>A♯ (U)</b>: <code>◀⚙</code> — rotate Gear Turret backward</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section className="help-section">
+              <h3>4. How the Three Mechanical Assemblies Work Together</h3>
+              <ol className="help-steps">
+                <li>
+                  <b>Paper Tape &amp; Pneumatic Tracker Bar (Left)</b>: Acts as both infinite memory and I/O. In stages <b>① q1</b> and <b>② q2</b>, the brass feeler pin drops into open holes (<code>1</code>), admitting air to stroke the driving pawl <code>+1 tooth</code>.
+                </li>
+                <li>
+                  <b>8-Tooth State Spur Gear (Center)</b>: The machine&apos;s finite state register (<code>INPUT → SCAN → q1 → q2 → q3 → q4 → WRITE → HALT</code>), coordinating when the tape shuttles left or right.
+                </li>
+                <li>
+                  <b>Rotary Gear Turret &amp; 4-Notch Ratchet (Right)</b>: Accumulates <code>A + B + Carry (0..3)</code> on a single 4-tooth wheel. In <b>③ q3</b>, raised cam lobes (<code>LOBE 1</code> vs <code>VALLEY 0</code>) fire the punch hammer; in <b>④ q4</b>, reaching Notch <code>≥ 2</code> locks the <b>Carry Latch</b> for the next bit to the left.
+                </li>
+              </ol>
+            </section>
+          </div>
+        </div>
+      </div>
+    )}
   </main>
 }
 
